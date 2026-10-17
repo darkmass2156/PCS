@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.4.4 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.4` |
 | 2026-10-17 | 0.4.3 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.3` |
 | 2026-10-17 | 0.4.2 | 5 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.2` |
 | 2026-10-17 | 0.4.1 | 4 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.1` |
@@ -22,6 +23,16 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.4 — 2026-10-17
+Host syntax check of firmware and `11_ui_dev`. Not yet compiled for AVR. Animation unchanged.
+
+### Fixed
+- `11_ui_dev`: replaying the boot sequence (BTN2 long / `s` / `p0..p2`) left the dashboard black, because the
+  screens still considered every widget drawn and only repainted values that changed. New `Screens::redraw()`,
+  called when the splash ends.
+- `BootSplash::begin()` resets the hardware scroll and invert, so a restart in the middle of the crash doesn't
+  leave the picture shifted or negative (firmware only starts it once, so no visible change there).
 
 ## BENCH 1.2 fix — 2026-10-17 (no FW change)
 ### Fixed

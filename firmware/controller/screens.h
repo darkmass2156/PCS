@@ -15,6 +15,7 @@ class Screens {
   void begin(Adafruit_ST7789 *t, uint16_t w, uint16_t h, const char *version);
   void update(uint32_t now, const UiData &d);   // switches screen when d.mode changes
   void sample(const UiData &d);                 // call at 1 Hz: chart history (kept in every mode)
+  void redraw() { mode = 0; }                   // screen was overwritten (e.g. splash): rebuild it fully
 
  private:
   enum Phase : uint8_t { CLEAR, STATIC, CHART, LIVE };

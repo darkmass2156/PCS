@@ -35,6 +35,9 @@ class BootSplash {
     ly = (H - 240) / 2 + ROG_Y0;
     step = BG;
     strip = 0;
+    scroll(0);                      // a restart in the middle of the crash must not keep its scroll/invert
+    tft->invertDisplay(invNormal);
+    inverted = false;
     for (uint8_t i = 0; i < NBANDS; i++) order[i] = i;
     at = now;
   }

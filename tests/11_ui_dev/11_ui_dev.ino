@@ -147,7 +147,7 @@ void loop() {
   if (c == 'm' || (c >= '1' && c <= '3')) { d.mode = mode; Serial.print(F("mode ")); Serial.println(mode); }
 
   if (splash.active()) {
-    splash.update(now);
+    if (splash.update(now)) screens.redraw();   // the splash ended on a black screen: rebuild the UI
     return;
   }
 
