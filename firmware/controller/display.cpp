@@ -1,5 +1,6 @@
 #include "display.h"
 #include "config.h"
+#include "version.h"
 #include "control.h"
 #include "sensors.h"
 #include "valve.h"
@@ -10,45 +11,21 @@
 #include <EEPROM.h>
 #include <math.h>
 
-#include "layout.h"
 #include "splash.h"
+#include "screens.h"
 
-static const uint16_t W = LAYOUT_W, H = LAYOUT_H;
+// Display rev 3: the dashboard screens are drawn for 280x240 (the 1.69" MSP1691 in landscape).
+#if DISPLAY_VARIANT != 1
+#error "Display rev 3 screens are 280x240 only (DISPLAY_VARIANT 1). The 1.9\" variant needs its own layouts."
+#endif
+static const uint16_t INIT_W = 240, INIT_H = 280;   // native portrait size for init()
+static const uint16_t W = 280, H = 240;              // after DISP_ROTATION 1/3
 
 static Adafruit_ST7789 tft(PIN_DISP_CS, PIN_DISP_DC, -1);
-
-static const uint16_t BG = ST77XX_BLACK;
-static const uint16_t C_LABEL = 0x8410;   // grey
-static const uint16_t C_VALUE = ST77XX_WHITE;
-static const uint16_t C_FAULT = ST77XX_RED;
-static const uint16_t C_ALARM = ST77XX_YELLOW;
-
-enum Field : uint8_t {
-  FD_MODE, FD_HEART, FD_T1, FD_T2, FD_TSET, FD_TOUT, FD_POT, FD_ROOM, FD_DP,
-  FD_P2, FD_V1, FD_V2, FD_MSG, FD_COUNT
-};
-
-struct FieldDef {
-  uint8_t row;
-  uint16_t labelX;
-  uint16_t valueX;
-  uint8_t width;      // chars, padded so stale text is overwritten
-};
-
-#if NTC_TRIMPOT_SIM
-static const uint8_t HB_W = 9;    // "SIM mm:ss"
-#else
-static const uint8_t HB_W = 8;    // "hh:mm:ss"
-#endif
-static const FieldDef fields[FD_COUNT] = LAYOUT_FIELDS;
-static const char *const labels[FD_COUNT] = {
-  NULL, NULL, "T1", "T2", "Tset", "Tout", "dTpot", "Room", "DP", "P2", "V1", "V2", NULL};
 static BootSplash splash;
-
-static char val[FD_COUNT][21];
-static uint16_t color[FD_COUNT];
-static uint16_t dirty;
-static uint8_t nextField;
+static Screens screens;
+static UiData ui;
+static bool uiReady;
 static uint32_t lastValuesAt, lastReinitAt;
 
 // ---------------- init sequence (2 MHz) ----------------
@@ -114,160 +91,81 @@ static uint8_t pickSplash() {
 }
 
 void displayInit() {
-  tft.init(LAYOUT_INIT_W, LAYOUT_INIT_H);   // native portrait size, at the library default clock ...
-  tft.setSPISpeed(DISP_SPI_HZ);   // ... so redo it at 2 MHz for the long cable
+  tft.init(INIT_W, INIT_H);         // runs at the library default clock ...
+  tft.setSPISpeed(DISP_SPI_HZ);     // ... so redo it at 2 MHz for the long cable
   for (uint8_t i = 0; i < INIT_STEPS; i++) {
     sendStep(i);
     delay(initSeq[i].waitMs);
   }
   applyOrientation();               // DISP_ROTATION 1/3 -> landscape W x H
-  tft.fillScreen(BG);
+  tft.fillScreen(ST77XX_BLACK);
   tft.cp437(true);
-  dirty = (1 << FD_COUNT) - 1;
+  screens.begin(&tft, W, H, "v" FW_VERSION);
   lastReinitAt = millis();
 #if BOOT_SPLASH
-  splash.begin(&tft, W, H, pickSplash(), lastReinitAt);
+  splash.begin(&tft, W, H, pickSplash(), FW_VERSION, DISP_INVERT, lastReinitAt);
 #endif
 }
 
-// ---------------- values ----------------
-static void fmtC(char *out, float v, bool ok) {
-  if (!ok || isnan(v)) strcpy(out, "--");
-  else dtostrf(v, 0, 1, out);
+// ---------------- data for the screens ----------------
+static float maxValid(float a, bool aOk, float b, bool bOk) {
+  if (aOk && bOk) return a > b ? a : b;
+  return aOk ? a : bOk ? b : NAN;
 }
 
-static uint8_t bitCount(uint16_t m) {
-  uint8_t n = 0;
-  for (; m; m &= m - 1) n++;
-  return n;
-}
-
-static const char *const faultNames[] = {
-  "NTC T1", "NTC T2", "NTC T3", "NO DP", "T2 LOW", "T1 LOW", "FUSE P2", "FUSE V", "P2 STALL"};
-static const char *const alarmNames[] = {
-  "FUSE FAN", "FAN1 STALL", "FAN2 STALL", "SHT A", "SHT B", "SHT ROOM", "DP SPREAD",
-  "M3 DEGRADED", "T1 LOW", "FEAS WAIT"};
-
-// n-th set bit of mask -> name
-static const char *nthName(uint16_t mask, uint8_t n, const char *const *names) {
-  for (uint8_t i = 0; i < 16; i++) {
-    if (!(mask & (1 << i))) continue;
-    if (n-- == 0) return names[i];
-  }
-  return "";
-}
-
-static void setVal(uint8_t f, const char *s, uint16_t c) {
-  if (strcmp(val[f], s) != 0 || color[f] != c) {
-    strncpy(val[f], s, sizeof(val[f]) - 1);
-    val[f][sizeof(val[f]) - 1] = 0;
-    color[f] = c;
-    dirty |= 1 << f;
-  }
-}
-
-static void computeValues(uint32_t now) {
-  char b[24], t[12];
-
-  // Mode / state
-  if (st.state == ST_NO12V) {
-    setVal(FD_MODE, "NO 12V", C_ALARM);
-  } else {
-    const char *s = st.state == ST_IDLE ? (st.mode == MODE_OFF ? "OFF" : "SLEEP") : stateName(st.state);
-    snprintf(b, sizeof(b), "M%u %s", st.mode, s);
-    uint16_t c = st.state == ST_SAFE ? C_FAULT
-               : st.mode == MODE_LOADCAP ? ST77XX_GREEN
-               : st.mode == MODE_MAX ? ST77XX_CYAN : ST77XX_ORANGE;
-    setVal(FD_MODE, b, c);
-  }
-
-  // Heartbeat: uptime
-  uint32_t s = now / 1000;
-#if NTC_TRIMPOT_SIM
-  snprintf(b, sizeof(b), "SIM %02u:%02u", (unsigned)((s / 60) % 60), (unsigned)(s % 60));
-#else
-  snprintf(b, sizeof(b), "%02u:%02u:%02u", (unsigned)((s / 3600) % 100), (unsigned)((s / 60) % 60),
-           (unsigned)(s % 60));
-#endif
-  setVal(FD_HEART, b, C_LABEL);
-
-  fmtC(b, ntcT1.c, ntcT1.valid);  setVal(FD_T1, b, ntcT1.valid ? C_VALUE : C_FAULT);
-  fmtC(b, ntcT2.c, ntcT2.valid);  setVal(FD_T2, b, ntcT2.valid ? C_VALUE : C_FAULT);
-  fmtC(b, st.tset, true);         setVal(FD_TSET, b, C_VALUE);
-  fmtC(b, st.tOut, st.tOutOk);    setVal(FD_TOUT, b, C_VALUE);
-
-  if (st.tOutOk && ntcT1.valid) {
-    float pot = ntcT1.c - st.tOut;
-    fmtC(t, pot, true);
-    if (K_POT > 0) snprintf(b, sizeof(b), "%d %ldW", (int)lround(pot), (long)(K_POT * pot));  // fits 8 chars
-    else strcpy(b, t);
-  } else {
-    strcpy(b, "--");
-  }
-  setVal(FD_POT, b, C_VALUE);
-
-  fmtC(b, sht[SHT_R].t, sht[SHT_R].valid);  setVal(FD_ROOM, b, C_VALUE);
-
-  fmtC(t, st.dp, st.dpValid > 0);
-  snprintf(b, sizeof(b), "%s x%u", t, st.dpValid);
-  setVal(FD_DP, b, st.dpValid ? C_VALUE : C_FAULT);
-
-  if (hwPen()) snprintf(b, sizeof(b), "%u%% %u", hwPumpPct(), rpmPump);
-  else strcpy(b, "OFF");
-  setVal(FD_P2, b, C_VALUE);
-
-  setVal(FD_V1, hwSen() ? "OPEN" : "SHUT", C_VALUE);
-
-  dtostrf(valveDeg(), 0, 1, t);
-  ValveDir m = valveMoving();
-  snprintf(b, sizeof(b), "%s%c%s%s", t, (char)248, valveHomed() ? "" : "?",
-           m == V_OPEN ? " >" : m == V_CLOSE ? " <" : "");
-  setVal(FD_V2, b, C_VALUE);
-
-  // Message line: rotate through faults (red), then alarms (yellow), 2 s each.
-  uint8_t nf = bitCount(st.faults), na = bitCount(st.alarms);
-  if (nf + na == 0) {
-    setVal(FD_MSG, "", C_VALUE);
-  } else {
-    uint8_t i = (s / 2) % (nf + na);
-    if (i < nf) setVal(FD_MSG, nthName(st.faults, i, faultNames), C_FAULT);
-    else setVal(FD_MSG, nthName(st.alarms, i - nf, alarmNames), C_ALARM);
-  }
-}
-
-static void drawField(uint8_t f) {
-  const FieldDef &d = fields[f];
-  int16_t y = LAYOUT_TOP + d.row * LAYOUT_ROW_H;
-  uint8_t size = f == FD_HEART ? 1 : LAYOUT_VALUE_SIZE;
-  uint8_t width = f == FD_HEART ? HB_W : d.width;
-  int16_t x = f == FD_HEART ? W - 4 - 6 * HB_W : d.valueX;
-  if (labels[f]) {
-    tft.setTextSize(1);
-    tft.setTextColor(C_LABEL, BG);
-    tft.setCursor(d.labelX, y + LAYOUT_LABEL_DY);
-    tft.print(labels[f]);
-  }
-  char b[32];
-  if (width > sizeof(b) - 1) width = sizeof(b) - 1;
-  snprintf(b, sizeof(b), "%-*s", width, val[f]);
-  b[width] = 0;
-  tft.setTextSize(size);
-  tft.setTextColor(color[f], BG);
-  tft.setCursor(x, y);
-  tft.print(b);
+static void buildUi() {
+  ui.mode = st.mode;
+  ui.state = st.state == ST_IDLE ? (st.mode == MODE_OFF ? "OFF" : "SLEEP") : stateName(st.state);
+  ui.no12v = st.state == ST_NO12V;
+  ui.sim = NTC_TRIMPOT_SIM;
+  ui.rad = ntcT3.valid ? ntcT3.c : NAN;
+  ui.loop = ntcT1.valid ? ntcT1.c : NAN;
+  ui.valve = ntcT2.valid ? ntcT2.c : NAN;
+  const ShtReading &a = sht[SHT_A], &b = sht[SHT_B], &r = sht[SHT_R];
+  ui.caseT = maxValid(a.t, a.valid, b.t, b.valid);          // the highest of the two, per value
+  ui.caseRH = maxValid(a.rh, a.valid, b.rh, b.valid);
+  ui.caseDP = maxValid(a.dp, a.valid, b.dp, b.valid);
+  ui.roomT = r.valid ? r.t : NAN;
+  ui.roomRH = r.valid ? r.rh : NAN;
+  ui.roomDP = r.valid ? r.dp : NAN;
+  ui.dpA = a.valid ? a.dp : NAN;
+  ui.dpB = b.valid ? b.dp : NAN;
+  ui.dpR = r.valid ? r.dp : NAN;
+  ui.dpValid = st.dpValid;
+  ui.dp = st.dpValid ? st.dp : NAN;
+  ui.tset = st.tset;
+  ui.tout = st.tOut;
+  ui.toutOk = st.tOutOk;
+  ui.potOk = st.tOutOk && ntcT1.valid;
+  ui.potK = ui.potOk ? ntcT1.c - st.tOut : NAN;
+  ui.potW = ui.potOk ? K_POT * ui.potK : NAN;
+  ui.extOpen = hwSen();
+  ui.homing = st.state == ST_HOMING || (!valveHomed() && valveBusy());
+  ui.mixing = valveHomed() && valveDeg() > V2_FLOW_DEG;
+  ui.v2deg = valveDeg();
+  ui.v2homed = valveHomed();
+  ui.fanPct = hwFanPct();
+  ui.rpmF1 = rpmFan1;
+  ui.rpmF2 = rpmFan2;
+  ui.p2On = hwPen();
+  ui.p2Pct = hwPumpPct();
+  ui.rpmP2 = rpmPump;
+  ui.dew = ui.valve - ui.dp;                              // NAN if either is
+  ui.faults = st.faults;
+  ui.alarms = st.alarms;
+  ui.fuses = (fusePresent[0] ? 1 : 0) | (fusePresent[1] ? 2 : 0) | (fusePresent[2] ? 4 : 0);
 }
 
 void displayUpdate(uint32_t now) {
-  // Boot splash first, one small step per call; then the dashboard from a black screen.
+  // Boot sequence first (Pingu, glitch, ROG), one small step per call.
   if (splash.active()) {
     if (splash.update(now)) {
-      dirty = (1 << FD_COUNT) - 1;
-      lastValuesAt = now - 1000;
       lastReinitAt = now;
+      lastValuesAt = now - 1000;
     }
     return;
   }
-  // Non-blocking re-init, one command per call.
+  // Non-blocking re-init, one command per call. SWRESET keeps GRAM, so nothing needs redrawing.
   if (initStep >= 0) {
     if ((int32_t)(now - initWaitUntil) < 0) return;
     if (initStep < INIT_STEPS) {
@@ -277,7 +175,6 @@ void displayUpdate(uint32_t now) {
     } else {
       applyOrientation();
       initStep = -1;
-      dirty = (1 << FD_COUNT) - 1;   // redraw everything (labels included), no clear
       lastReinitAt = now;
     }
     return;
@@ -290,17 +187,11 @@ void displayUpdate(uint32_t now) {
 
   if (now - lastValuesAt >= 1000) {
     lastValuesAt = now;
-    computeValues(now);
+    buildUi();
+    screens.sample(ui);
+    uiReady = true;
   }
-
-  // One field per call keeps each SPI burst short.
-  for (uint8_t k = 0; k < FD_COUNT; k++) {
-    uint8_t f = (nextField + k) % FD_COUNT;
-    if (dirty & (1 << f)) {
-      dirty &= ~(1 << f);
-      drawField(f);
-      nextField = f + 1;
-      return;
-    }
-  }
+  if (!uiReady) return;
+  ui.mode = st.mode;                // mode switches show at once, not on the next 1 s tick
+  screens.update(now, ui);
 }

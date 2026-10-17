@@ -10,7 +10,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | Hardware | 4b + display CS mod + SHT30 on D34/D36 | this file, `docs/build_component_list_rev4b.xlsx` |
 | Schematic | rev11 | `docs/schematics/full_loop_schematic_rev11.png` |
 | Control logic | rev 2 | this file → Control; change note `docs/changes/logic_rev2.md` |
-| Display software | rev 2 (landscape, boot splash, sim/real target) | this file → Display; `DISPLAY_REV` in `version.h` |
+| Display software | rev 3 (Pingu → glitch → ROG boot, one screen per mode) | this file → Display; `DISPLAY_REV` in `version.h` |
 | Firmware | see `firmware/controller/version.h` | `CHANGELOG.md` |
 
 ### How revisions are tracked
@@ -35,7 +35,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - Every bench test is driven by **BTN1/BTN2** (breadboard buttons to GND work: tests use INPUT_PULLUP);
   the button map is in the sketch header and printed at boot. Serial commands stay as a backup.
 - Shared bench code is `tests/common/bench.h` (canonical, `BENCH_VERSION`); each test folder holds an
-  identical copy. Same for `softi2c.*`, `layout.h`, `splash.h` and `boot_sprite.h` (canonical in `firmware/controller/`).
+  identical copy. Same for `softi2c.*` and the display files `scr_gfx.*`, `scr_data.h`, `screens.*`, `splash.h`,
+  `boot_sprite.h`, `rog_logo.h` (canonical in `firmware/controller/`, copied into `tests/11_ui_dev`).
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
   Everything else (SHT3x, soft I2C) is in-tree.
@@ -72,7 +73,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
   because 0x44/0x45 are taken). SHT30 powered from the Mega header 5V/GND; no board change.
 - **Display**: one ST7789 IPS screen in the case (see Display), mounted landscape. The 1.69" MSP1691 is the
-  one in use (280x240 landscape); the 1.9" stays supported as variant 2.
+  one in use (280x240 landscape). The 1.9" (variant 2) has no dashboard layouts since display rev 3.
   The 0.91" I2C OLEDs are **not** used.
 - **Top panel**: 570X buttons BTN1 and BTN2, plus an RGB status LED under the power button.
   Button 3 and the power button go to the Apex, not the Mega.
@@ -153,10 +154,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   0 = the real ST7789 → mirror 0, BGR 0, invert 1. The banner says when a build is for the simulator.
   **Set 0 before flashing the real controller.**
 - **Landscape** (display rev 1): `DISP_ROTATION 1` (3 if mounted upside down). `init()` takes the panel's native
-  portrait size (`LAYOUT_INIT_W/H`), the rotation turns it into `LAYOUT_W x LAYOUT_H`.
-- **Two variants, one compile-time switch** (`DISPLAY_VARIANT` in `config.h`). Code must work on both.
-  - `1` = MSP1691, 1.69", **280x240** landscape (in use)
-  - `2` = MSP1901, 1.9", 320x170 landscape
+  portrait size (240x280), the rotation turns it into 280x240.
+- **Variant**: `DISPLAY_VARIANT 1` = MSP1691, 1.69", **280x240** landscape. Display rev 3 screens are drawn for
+  280x240 only; variant 2 (1.9" 320x170) stops with a compile error until it gets its own layouts.
 - **Library**: Adafruit_ST7789 + Adafruit_GFX. Use `init(240, 280)` or `init(170, 320)`; the library handles the panel offsets.
 - **Field report (1.69", one buyer)**: Adafruit with `init(240, 280)` worked. Fallbacks (`config.h`):
   - red and blue swapped → `DISP_BGR 1`
@@ -168,25 +168,37 @@ coolant entering the PC must never drop below in-case dew point + margin.
   re-sends the init sequence (SWRESET → SLPOUT → COLMOD → NORON → DISPON) at 2 MHz.
 - **D53** stays OUTPUT (DC, and SPI master needs it). **D50** is MISO, unusable as output.
 - **Backlight** is tied to VCC, so it's always on with no dimming.
-- **Redraw**: 1 Hz, only the fields that changed, one field per loop pass, text drawn with background colour.
-  No full-screen clears (they flicker).
-- **Self-heal**: uptime heartbeat; non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min.
-  The RGB LED stays the authoritative status.
-- **Layout**: geometry lives in `firmware/controller/layout.h`, one block per variant: a header row
-  (mode/state + heartbeat), two columns of five fields, and a message row. Each field is {row, labelX, valueX,
-  width}. Tune it on the panel with `tests/11_ui_dev` and paste the block it prints ('p').
-- **Boot splash** (`splash.h`, `BOOT_SPLASH 1`): one of three penguins at random (hobo with stick and bundle,
-  sitting with the long trumpet, bowing with O-lips); never the same one twice across warm resets.
-  He "noots" twice (beak → trumpet / O-lips), ~3 s, then the screen clears to black for the dashboard.
-  Non-blocking: one small drawing step per loop pass, so control, LED heartbeat and watchdog keep running.
-  Drawing streams pixels through one address window per chunk (6 sprite rows, or a whole beak patch)
-  instead of one fillRect per colour run: ~13 windows per splash instead of hundreds.
-  The choice is seeded from an EEPROM boot counter (addr 2) and the last penguin is kept in EEPROM (addr 3).
-  Sprites are original pixel art generated by `tools/sprites/make_pingu.py` → `boot_sprite.h`
-  (preview: `docs/display/pingu_preview.png`). This one-off clear is the only full-screen fill.
-- **Fields (rev 2)**: mode/state + heartbeat, T1, T2, T_set, T_out, cooling potential (ΔT, W once K_POT is set),
-  T_room, DP, P2 (PWM % + rpm, or OFF), V1 (OPEN/SHUT), V2 angle (`?` when not homed), active fault in red,
-  "NO 12V" when the PC is off.
+- **Redraw**: values are collected once per second into `UiData` (`scr_data.h`, filled by `display.cpp`);
+  the screens redraw only widgets whose content changed, one widget per loop pass, text with background colour
+  and segment digits by changed segment, so nothing flickers. A mode change clears the screen (in strips) and
+  rebuilds it over a few passes — the only full-screen fills besides the boot sequence.
+- **Self-heal**: non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min. A small dot in the header
+  toggles every second (no clock). The RGB LED stays the authoritative status.
+- **Boot sequence** (`splash.h`, `BOOT_SPLASH 1`, ~5.5 s, non-blocking, all streamed through address windows):
+  1. Pingu: one of three penguins at random (hobo with stick and bundle, sitting with the long trumpet, bowing
+     with O-lips), never the same twice in a row (EEPROM boot counter addr 2, last shown addr 3). Noots twice.
+  2. Glitch: bands of the penguin tear sideways, scanline noise, two inverted-colour flashes, black bands eat
+     the picture ("signal lost").
+  3. ROG: Vlad's logo (`docs/display/rog_logo_280x240.png` → `tools/sprites/make_rog.py` → `rog_logo.h`) in dark
+     grey, white wipe with a red edge, red underline + "PCS fw x.y.z", hold, clear to black.
+  Pingu sprites: original pixel art, `tools/sprites/make_pingu.py` → `boot_sprite.h`.
+- **Screens** (`screens.cpp`, palette F3F3F3 / B2B2B2 / 525152 / 420704 / A71C1E / DE272C + black):
+  - Mode 1 *standard*: black, white values. Outside rad / loop 1 return / mixing valve big (segment digits),
+    case and room cards (temp, humidity, dew point), tiles for cooling W, external loop OPEN/CLOSED,
+    valve MIXING/BYPASS/HOMING, fan STOPPED/xx %, distance to dew with a bar (red zone < 2 °C).
+  - Mode 2 *sport* (graphite): slanted digits, 10-segment bars per temperature on one scale −10…40 °C with a red
+    tip, compact case/room lines, cooling power meter 0…1000 W, chips, distance to dew as 12 shift lights
+    (1 °C each, the first two red).
+  - Mode 3 *engineer*: grey, P&ID of the branch with live values, raw table (DP A/B/R, DP max, T_set, T_out,
+    ΔT/W, P2, fans, fuse/fault/alarm masks), case/room line, sweeping chart of T2, T_set (dashed) and DP,
+    1 px = 1 s (272 s), 0…35 °C.
+  - Data rules: case values = the highest of the two SHT31s, per value. Distance to dew = mixing valve (T2) − DP
+    (max of all valid). Cooling W = `K_POT` × (T1 − T_out).
+  - Faults: in Modes 1/2 the bottom strip becomes a red banner (rotating through active faults); "NO 12V - PC OFF"
+    on grey when 12V is absent. Mode 3 shows the fault in its bottom line and the masks in the table.
+- **Tools**: `tests/11_ui_dev` runs the real screens and boot sequence on the panel with fake data (buttons switch
+  mode/scenario). `tools/ui_preview/run.sh` renders the same code on the host into `docs/display/preview_*.png`
+  (look-alike font; layout and colours exact).
 
 ## Hydraulics (matches rev11 schematic)
 ```
@@ -324,7 +336,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 10. `09_pump2`
 11. `10_v2_calibration` — t_open/t_close (button-marked), backlash, indicator linearity, and on the filled
     loop the flow characteristic f(θ) = (T1 − T2)/(T1 − T3). Output → V2 tunables and the θ equation.
-12. `11_ui_dev` — screen layout tool (scenarios, grid, colours, live layout edits, draw timings) and splash replay.
+12. `11_ui_dev` — the real dashboard screens and boot sequence with fake data (mode/scenario on the buttons).
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the
@@ -350,7 +362,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   - `HARD_LOW_OFFSET_C` = 1.0, `T2_TRIP_DP_C` = 1.0, `T1_TRIP_DP_C` = 2.0, `DEADBAND_C` = 0.5
   - `WAKE_OFFSET_C` = 1.0, `SLEEP_PARK_MIN` = 10
   - `FEAS_OPEN_C` = 5.0, `FEAS_FORCE_C` = 1.0, `FEAS_FORCE_MS` = 120000, `T_OUT_SETTLE_MIN` = 10 (ASSUMED)
-  - `DP_SPREAD_ALARM_C` = 2.0, `K_POT` = 0 (W/K, TBD)
+  - `DP_SPREAD_ALARM_C` = 2.0, `K_POT` = 25.0 W/°C (placeholder until the A/B calibration test)
 - V2: `V2_T_OPEN_MS` / `V2_T_CLOSE_MS` = 30000 placeholder (TBD), `V2_BACKLASH_MS` = 0 (TBD), `V2_HOME_OVERDRIVE` = 1.3,
   `V2_MIN_PULSE_MS` = 150, `V2_REVERSE_DEADTIME_MS` = 500, `V2_CTRL_PERIOD_MS` = 10000,
   gains/max pulses, `V2_START_LIMIT_MIN` = 5, `V2_START_RATE_DEG_MIN` = 5

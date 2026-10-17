@@ -28,7 +28,7 @@
 #define PIN_DISP_DC   53
 
 // ---------------- Display ----------------
-#define DISPLAY_VARIANT 1          // 1 = MSP1691 240x280, 2 = MSP1901 170x320
+#define DISPLAY_VARIANT 1          // 1 = MSP1691 (280x240 landscape); 2 = MSP1901 has no layouts since display rev 3
 #define DISP_SPI_HZ     2000000UL
 // Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
 // MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
@@ -43,7 +43,7 @@
 #define DISP_BGR        0          // set if red and blue are swapped
 #define DISP_MIRROR_X   0          // set if text is mirrored
 #endif
-#define DISP_ROTATION   1          // landscape (layout.h W x H); 3 = landscape upside down
+#define DISP_ROTATION   1          // landscape 280x240; 3 = landscape upside down
 #define BOOT_SPLASH     1          // penguin "noot noot" splash at boot (non-blocking, ~3 s)
 #define DISP_REINIT_MS  300000UL
 
@@ -62,7 +62,7 @@
 #define FEAS_FORCE_MS      120000UL // ... for this long while flowing
 #define T_OUT_SETTLE_MIN   10      // ASSUMED: stagnation time before T_out tracks T3
 #define DP_SPREAD_ALARM_C  2.0f
-#define K_POT              0.0f    // W/K, 0 = not calibrated (hidden)
+#define K_POT              25.0f   // W/°C, placeholder until the A/B calibration test
 
 // ---------------- V2 ----------------
 #define V2_T_OPEN_MS           30000UL  // TBD: 07_valve

@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.4.0 | 3 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.0` |
 | 2026-10-17 | 0.3.1 | 2 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.1` |
 | 2026-10-17 | 0.3.0 | 1 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.0` |
 | 2026-10-17 | 0.2.0 | — | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.2.0` |
@@ -18,6 +19,31 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.0, DISP rev 3, BENCH 1.2 — 2026-10-17
+New dashboard: one screen per mode, ROG palette, plus the Pingu → glitch → ROG boot sequence. Rendered on the
+host with `tools/ui_preview` (all modes: normal, changed values, fault, no 12V; boot frames of all three
+penguins), host syntax check of firmware and `11_ui_dev`. Not yet compiled for AVR.
+
+### Added
+- `screens.*` (Mode 1 standard, Mode 2 sport/graphite, Mode 3 engineer with P&ID, raw table and a 272 s sweeping
+  T2/T_set/DP chart), `scr_gfx.*` (palette, padded text, slanted shapes, segment digits redrawn per segment),
+  `scr_data.h` (`UiData`, filled once per second by `display.cpp`).
+- Boot: glitch transition (sprite bands torn sideways, scanline noise, two invert flashes, black bands) and the
+  ROG logo (dark grey → white wipe with red edge → underline + version). `rog_logo.h` from Vlad's 280x240 artwork
+  via `tools/sprites/make_rog.py` (run-length, round-trip checked).
+- `tools/ui_preview/`: host framebuffer stand-in for the display library; renders the real display code to
+  `docs/display/preview_boot.png` and `preview_modes.png`.
+
+### Changed
+- Big values: outside rad, loop 1 return, mixing valve. Smaller: case/room temp, humidity, dew point; cooling W,
+  external loop, mixing valve, outdoor fan, distance to dew (T2 − DP max).
+- Case values show the highest of the two SHT31s, per value. `K_POT` = 25.0 W/°C (placeholder).
+- Clock removed; a 1 Hz dot stays as the frozen-screen check.
+- Faults: red banner in Modes 1/2 (rotating through active faults), bottom line in Mode 3.
+- `layout.h` removed (each mode has its own layout now). Variant 2 (1.9") has no layouts: compile error.
+- BENCH 1.2: `11_ui_dev` runs the real screens and boot sequence with fake data (BTN1 mode, BTN2 scenario,
+  BTN1 long animate, BTN2 long boot sequence).
 
 ## FW 0.3.1, DISP rev 2 — 2026-10-17
 Fixes from the first Wokwi run (ILI9341 part driven by the ST7789 code). Splash re-verified on a strict
