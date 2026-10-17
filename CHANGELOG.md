@@ -2,17 +2,42 @@
 
 Newest first. Each entry says which revision it belongs to:
 **FW** = firmware (`firmware/controller/version.h`), **LOGIC** = control logic rev,
-**HW** = hardware rev, **SCH** = schematic rev, **DOC** = documentation only.
+**HW** = hardware rev, **SCH** = schematic rev, **BENCH** = bench sketches (`tests/common/bench.h`),
+**DOC** = documentation only.
 Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the authoritative spec.
 
 ## Revision index
-| Date | FW | Logic | HW | Schematic | Git tag |
-|---|---|---|---|---|---|
-| 2026-10-17 | 0.1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
-| 2026-10-17 | — | 2 | 4b + CS mod + SHT30 | rev11 | `logic-r2` |
-| 2026-10-17 | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
+| Date | FW | Bench | Logic | HW | Schematic | Git tag |
+|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.2.0 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.2.0` |
+| 2026-10-17 | 0.1.0 | 1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
+| 2026-10-17 | — | — | 2 | 4b + CS mod + SHT30 | rev11 | `logic-r2` |
+| 2026-10-17 | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.2.0 + BENCH 1.1 — 2026-10-17
+Still not compiled for AVR in the build session (host syntax check of both firmware variants,
+normal and SIM, plus all 12 sketches; LED behaviour simulated).
+
+### Changed (FW)
+- Status LED scheme decided: Mode 1 white / Mode 2 blue / Mode 3 red slow breathing, 3 fast green pulses
+  on a mode change. Driven from `loop()` only so a hang freezes it (watchdog resets 2 s later).
+  Overlays kept as ASSUMED: 12V absent off, latched fault fast red, alarm yellow flash.
+- Display geometry moved to `layout.h` (one block per variant) so `11_ui_dev` can generate it.
+
+### Added (FW)
+- Trimpot test build: `NTC_TRIMPOT_SIM` (3296W 10k as rheostat → −30…+50 °C linear), with optional
+  `SIM_FORCE_12V` and `SIM_FAKE_P2_TACH` for a breadboard. SIM shown in banner and on the display.
+
+### Added / changed (BENCH)
+- `tests/common/bench.h`: shared outputs-LOW, debounced BTN1/BTN2 (short / long / held / edges), LED helpers.
+- All tests 00–09 operable from BTN1/BTN2 (maps in each header). 00 now demos the LED heartbeat and
+  simulates a hang (BTN2 long). 03 checks fuse scenarios PASS/FAIL. 07 jogs V2 hold-to-run.
+- New `10_v2_calibration`: travel times, backlash, indicator linearity, on-loop flow characteristic sweep
+  with DP/T2-floor, stall and 12 V aborts. Prints config lines.
+- New `11_ui_dev`: layout tool with scenarios, grid, colour/font page, live edits, draw timings,
+  prints a `layout.h` block.
 
 ## FW 0.1.0 — 2026-10-17 (logic rev 2, HW 4b + CS + SHT30)
 First firmware. **Not yet compiled for AVR** (no toolchain in the build session) — first IDE compile may

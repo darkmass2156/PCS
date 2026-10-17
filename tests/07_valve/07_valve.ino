@@ -1,14 +1,16 @@
-// 07_valve — V2 CR-02: VO D22 (open), VC D24 (close), both high-side via IRF4905. Needs 12 V (S3 checked).
-// Goals: direction (VO should move toward ALL-PORTS-OPEN, VC toward BYPASS-ONLY), t_full open,
-// t_full close, backlash.
-// Commands:
-//   o / c      run open / close until the autostop; press 'm' the moment motion stops -> prints elapsed ms
-//   O<ms>      open pulse, e.g. O1000      C<ms>  close pulse
-//   s          stop (both LOW)
-// Backlash: from mid-travel do O2000, then C pulses of 100 ms (C100 ...) until the stem visibly moves back;
-// the summed close time before movement is the backlash.
-// The interlock here mirrors the firmware: one drive() function, 500 ms dead time before reversing,
-// and a 60 s safety timeout on every run.
+// 07_valve — V2 CR-02: VO D22 (open), VC D24 (close), high-side via IRF4905. Needs 12 V (S3 checked).
+// Quick checks: direction (VO toward ALL-PORTS-OPEN, VC toward BYPASS-ONLY), autostop at both ends,
+// interlock. For travel times, backlash and the θ equation use tests/10_v2_calibration.
+//
+// Buttons (hold to jog):
+//   BTN1 held   VO on while held (open)     BTN2 held   VC on while held (close)
+//   release     stops, prints how long it ran
+//   both held   nothing moves (interlock), prints INTERLOCK
+// Serial: o / c run to the end (60 s cap), O<ms> / C<ms> pulses, m = mark elapsed, s = stop.
+// LED: green opening, blue closing, red = refused (no 12 V or interlock).
+// Interlock mirrors the firmware: one drive() function, 500 ms dead time before reversing.
+
+#include "bench.h"
 
 const uint8_t VO = 22, VC = 24;
 int8_t dir;            // 1 open, -1 close, 0 stopped
@@ -20,13 +22,28 @@ void drive(int8_t d) {
   digitalWrite(VC, LOW);
   if (d > 0) digitalWrite(VO, HIGH);
   else if (d < 0) digitalWrite(VC, HIGH);
+  benchLed(0, d > 0 ? 120 : 0, d < 0 ? 120 : 0);
 }
 
 bool twelveVolt() { return analogRead(A2) >= 500; }
 
+void halt(const __FlashStringHelper *why) {
+  drive(0);
+  if (dir != 0) {
+    Serial.print(why); Serial.print(dir > 0 ? F(" open ") : F(" close "));
+    Serial.print(millis() - startAt); Serial.println(F(" ms"));
+    stopAt = millis();
+  }
+  dir = 0;
+}
+
 void run(int8_t d, uint32_t ms) {
-  if (!twelveVolt()) { Serial.println(F("S3 low: no 12 V on the valve fuse, not moving")); return; }
-  if (dir != 0) { drive(0); dir = 0; stopAt = millis(); }
+  if (!twelveVolt()) {
+    Serial.println(F("S3 low: no 12 V on the valve fuse, not moving"));
+    benchLed(150, 0, 0);
+    return;
+  }
+  if (dir != 0) halt(F("stop"));
   if (lastDir != 0 && d != lastDir) {
     while (millis() - stopAt < 500) {}
   }
@@ -35,27 +52,28 @@ void run(int8_t d, uint32_t ms) {
   startAt = millis();
   endAt = startAt + ms;
   drive(d);
-  Serial.print(d > 0 ? F("OPEN ") : F("CLOSE ")); Serial.print(ms); Serial.println(F(" ms"));
-}
-
-void halt(const __FlashStringHelper *why) {
-  drive(0);
-  if (dir != 0) {
-    Serial.print(why); Serial.print(F(" after ")); Serial.print(millis() - startAt); Serial.println(F(" ms"));
-  }
-  dir = 0;
-  stopAt = millis();
 }
 
 void setup() {
-  const uint8_t outs[] = {22, 24, 26, 28, 2, 3, 9, 10, 11};
-  for (uint8_t p : outs) { digitalWrite(p, LOW); pinMode(p, OUTPUT); }
+  benchOutputsLow();
   Serial.begin(115200);
-  Serial.println(F("# 07_valve  commands: o c O<ms> C<ms> m s"));
+  benchBanner(F("07_valve"));
+  Serial.println(F("hold BTN1 = open, hold BTN2 = close; serial o c O<ms> C<ms> m s"));
   Serial.print(F("S3 adc ")); Serial.println(analogRead(A2));
+  benchButtonsBegin();
 }
 
 void loop() {
+  benchButtonsUpdate();
+  if (btn1.down && btn2.down) {
+    if (dir != 0) halt(F("INTERLOCK"));
+    benchLed(150, 0, 0);
+  } else {
+    if (btn1.pressed) run(1, 60000);
+    if (btn2.pressed) run(-1, 60000);
+    if ((btn1.released && dir > 0) || (btn2.released && dir < 0)) halt(F("released"));
+  }
+
   while (Serial.available()) {
     char c = Serial.read();
     if (c == 'o') run(1, 60000);
@@ -63,10 +81,9 @@ void loop() {
     else if (c == 'O') run(1, Serial.parseInt());
     else if (c == 'C') run(-1, Serial.parseInt());
     else if (c == 'm') {
-      Serial.print(F("MARK ")); Serial.print(dir > 0 ? F("open ") : dir < 0 ? F("close ") : F("(idle) "));
-      Serial.print(millis() - startAt); Serial.println(F(" ms since start"));
+      Serial.print(F("MARK ")); Serial.print(millis() - startAt); Serial.println(F(" ms since start"));
     }
     else if (c == 's') halt(F("STOP"));
   }
-  if (dir != 0 && (int32_t)(millis() - endAt) >= 0) halt(F("done"));
+  if (dir != 0 && (int32_t)(millis() - endAt) >= 0) halt(F("timeout"));
 }

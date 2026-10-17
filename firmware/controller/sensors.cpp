@@ -30,8 +30,13 @@ static uint32_t ntcAt;
 static float ntcToC(float adc) {
   if (adc < 1.0f || adc > 1022.0f) return NAN;   // short / open
   float r = NTC_R_PULLUP * adc / (1023.0f - adc);
+#if NTC_TRIMPOT_SIM
+  if (r < SIM_SHORT_OHM || r > 10500.0f) return NAN;
+  return SIM_T_MIN_C + (SIM_T_MAX_C - SIM_T_MIN_C) * r / 10000.0f;
+#else
   float invT = 1.0f / 298.15f + log(r / NTC_R25) / NTC_BETA;
   return 1.0f / invT - 273.15f;
+#endif
 }
 
 static void ntcUpdate(uint32_t now) {
@@ -45,7 +50,7 @@ static void ntcUpdate(uint32_t now) {
     if (!ch.primed) { ch.adcF = adc; ch.primed = true; }
     ch.adcF += (adc - ch.adcF) / 8.0f;  // ~0.8 s time constant at 10 Hz
     float c = ntcToC(ch.adcF);
-    if (!isnan(c)) c += ch.offset;
+    if (!isnan(c) && !NTC_TRIMPOT_SIM) c += ch.offset;
     NtcReading &o = *ch.out;
     o.c = c;
     o.inRange = !isnan(c) && c >= NTC_MIN_C && c <= NTC_MAX_C;

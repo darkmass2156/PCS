@@ -95,6 +95,19 @@
 #define NTC_MAX_C      80.0f
 #define NTC_FAULT_MS   2000UL
 
+// ---------------- Bench test build (trimpots instead of NTCs) ----------------
+// NTC_TRIMPOT_SIM 1: each NTC input takes a 3296W 10k trimpot wired as a rheostat (wiper + one end)
+// in place of the probe. R 0..10k maps linearly to SIM_T_MIN_C..SIM_T_MAX_C (25 turns ≈ 3.2 °C/turn).
+// < SIM_SHORT_OHM reads as a short and > 10.5k (unplugged) as open: both raise the NTC fault.
+// Banner, CSV header and display show "SIM". Never ship with this set.
+#define NTC_TRIMPOT_SIM   0
+#define SIM_T_MIN_C       -30.0f   // at 0 ohm
+#define SIM_T_MAX_C       50.0f    // at 10k
+#define SIM_SHORT_OHM     50.0f
+// Only honoured when NTC_TRIMPOT_SIM is 1 — for a breadboard without Board 1 / pump:
+#define SIM_FORCE_12V     0        // treat S1..S3 as present
+#define SIM_FAKE_P2_TACH  0        // report 3000 rpm whenever PEN is on (no stall fault)
+
 // ---------------- SHT3x ----------------
 #define SHT_PERIOD_MS   2000UL
 #define SHT_FAIL_LIMIT  3

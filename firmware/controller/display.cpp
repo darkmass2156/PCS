@@ -9,15 +9,9 @@
 #include <Adafruit_ST7789.h>
 #include <math.h>
 
-#if DISPLAY_VARIANT == 1
-static const uint16_t W = 240, H = 280;
-static const uint8_t ROW_H = 23;
-#elif DISPLAY_VARIANT == 2
-static const uint16_t W = 170, H = 320;
-static const uint8_t ROW_H = 26;
-#else
-#error "DISPLAY_VARIANT must be 1 or 2"
-#endif
+#include "layout.h"
+
+static const uint16_t W = LAYOUT_W, H = LAYOUT_H;
 
 static Adafruit_ST7789 tft(PIN_DISP_CS, PIN_DISP_DC, -1);
 
@@ -33,29 +27,34 @@ enum Field : uint8_t {
 };
 
 struct FieldDef {
-  uint8_t row;
   uint8_t x;
   uint8_t size;
   uint8_t width;      // chars, padded so stale text is overwritten
   const char *label;  // NULL = no label
 };
 
-static const uint8_t VX = 40, VW = 10;
+#if NTC_TRIMPOT_SIM
+static const uint8_t HB_W = 9;    // "SIM mm:ss"
+#else
+static const uint8_t HB_W = 8;    // "hh:mm:ss"
+#endif
+static const uint8_t VX = LAYOUT_VALUE_X, VS = LAYOUT_VALUE_SIZE, VW = LAYOUT_VALUE_W;
 static const FieldDef fields[FD_COUNT] = {
-  {0, 4, 2, 9, NULL},
-  {0, (uint8_t)(W - 52), 1, 8, NULL},
-  {1, VX, 2, VW, "T1"},
-  {2, VX, 2, VW, "T2"},
-  {3, VX, 2, VW, "Tset"},
-  {4, VX, 2, VW, "Tout"},
-  {5, VX, 2, VW, "dTpot"},
-  {6, VX, 2, VW, "Room"},
-  {7, VX, 2, VW, "DP"},
-  {8, VX, 2, VW, "P2"},
-  {9, VX, 2, VW, "V1"},
-  {10, VX, 2, VW, "V2"},
-  {11, 4, 2, (uint8_t)(W / 12 - 1), NULL},
+  {LAYOUT_LABEL_X, VS, 9, NULL},
+  {(uint8_t)(W - 4 - 6 * HB_W), 1, HB_W, NULL},
+  {VX, VS, VW, "T1"},
+  {VX, VS, VW, "T2"},
+  {VX, VS, VW, "Tset"},
+  {VX, VS, VW, "Tout"},
+  {VX, VS, VW, "dTpot"},
+  {VX, VS, VW, "Room"},
+  {VX, VS, VW, "DP"},
+  {VX, VS, VW, "P2"},
+  {VX, VS, VW, "V1"},
+  {VX, VS, VW, "V2"},
+  {LAYOUT_LABEL_X, VS, (uint8_t)((W - 2 * LAYOUT_LABEL_X) / (6 * VS)), NULL},
 };
+static const uint8_t rows[FD_COUNT] = LAYOUT_ROWS;
 
 static char val[FD_COUNT][21];
 static uint16_t color[FD_COUNT];
@@ -160,8 +159,12 @@ static void computeValues(uint32_t now) {
 
   // Heartbeat: uptime
   uint32_t s = now / 1000;
+#if NTC_TRIMPOT_SIM
+  snprintf(b, sizeof(b), "SIM %02u:%02u", (unsigned)((s / 60) % 60), (unsigned)(s % 60));
+#else
   snprintf(b, sizeof(b), "%02u:%02u:%02u", (unsigned)((s / 3600) % 100), (unsigned)((s / 60) % 60),
            (unsigned)(s % 60));
+#endif
   setVal(FD_HEART, b, C_LABEL);
 
   fmtC(b, ntcT1.c, ntcT1.valid);  setVal(FD_T1, b, ntcT1.valid ? C_VALUE : C_FAULT);
@@ -210,11 +213,11 @@ static void computeValues(uint32_t now) {
 
 static void drawField(uint8_t f) {
   const FieldDef &d = fields[f];
-  int16_t y = 4 + d.row * ROW_H;
+  int16_t y = LAYOUT_TOP + rows[f] * LAYOUT_ROW_H;
   if (d.label) {
     tft.setTextSize(1);
     tft.setTextColor(C_LABEL, BG);
-    tft.setCursor(4, y + 5);
+    tft.setCursor(LAYOUT_LABEL_X, y + LAYOUT_LABEL_DY);
     tft.print(d.label);
   }
   char b[24];

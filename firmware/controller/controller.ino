@@ -27,6 +27,12 @@ static void printHeader() {
   Serial.print(LOGIC_REV);
   Serial.print(F(" hw " HW_REV " display variant "));
   Serial.println(DISPLAY_VARIANT);
+#if NTC_TRIMPOT_SIM
+  Serial.print(F("# SIM BUILD: NTC inputs are trimpots"));
+  if (SIM_FORCE_12V) Serial.print(F(", 12V forced present"));
+  if (SIM_FAKE_P2_TACH) Serial.print(F(", P2 tach faked"));
+  Serial.println();
+#endif
   Serial.println(F("ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,"
                    "rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms"));
 }

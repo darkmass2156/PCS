@@ -1,11 +1,16 @@
 // 09_pump2 — P2: PEN D26 (12 V high-side), PUMP_PWM D3 (OC3C, 25 kHz), tach D12 (PCINT6), 2 pulses/rev.
 // ONLY with the loop filled: a D5 must never run dry. V2 at bypass gives P2 a path via the Barrow valve.
-// First confirm P2 is the 4-pin PWM + tach Bykski (rev 1 doc conflict).
-// Commands:
-//   p<pct>   PEN on at this duty, e.g. p80        0  PEN off, PWM 0
-//   r        ramp 20..100 % in 10 % steps, 10 s each (checks higher duty = faster)
-//   n        PEN on with no PWM signal (pin LOW) -> what does the pump do?
-// Prints rpm each second and flags a stall (rpm 0 for > 5 s after 3 s spin-up) like the firmware does.
+// First confirm P2 is the 4-pin PWM + tach Bykski.
+//
+// Buttons:
+//   BTN1 short  PEN on at 50 %, then +10 % per press     BTN2 short  -10 % (at 10 %: stays on)
+//   BTN1 long   ramp 20..100 % in 10 % steps, 10 s each (checks higher duty = faster)
+//   BTN2 long   PEN off
+// Serial: p<pct> on at duty, 0 off, r ramp, n on with no PWM signal (pin LOW).
+// Prints rpm each second; STALL like the firmware (rpm 0 > 5 s after 3 s spin-up).
+// LED: blue brightness = duty, red = stall.
+
+#include "bench.h"
 
 const uint8_t PEN = 26;
 volatile uint16_t pulses;
@@ -16,21 +21,22 @@ ISR(PCINT0_vect) {
   prev = now;
 }
 
+bool on, ramp;
+uint8_t duty;
+uint32_t onAt, zeroSince, rampAt;
+
 void setDuty(uint8_t pct) {
   if (pct == 0) { TCCR3A &= ~_BV(COM3C1); digitalWrite(3, LOW); return; }
   OCR3C = (uint16_t)(640UL * pct / 100) - 1;
   TCCR3A |= _BV(COM3C1);
 }
 
-bool on, ramp;
-uint8_t duty;
-uint32_t onAt, zeroSince, rampAt;
-
 void start(uint8_t pct) {
-  duty = pct;
-  setDuty(pct);
+  duty = pct > 100 ? 100 : pct;
+  setDuty(duty);
   if (!on) { digitalWrite(PEN, HIGH); on = true; onAt = millis(); zeroSince = 0; }
-  Serial.print(F("PEN on, duty ")); Serial.println(pct);
+  benchLed(0, 0, duty * 2);
+  Serial.print(F("PEN on, duty ")); Serial.println(duty);
 }
 
 void stop() {
@@ -39,12 +45,12 @@ void stop() {
   setDuty(0);
   on = false;
   duty = 0;
+  benchLed(0, 0, 0);
   Serial.println(F("PEN off"));
 }
 
 void setup() {
-  const uint8_t outs[] = {22, 24, 26, 28, 2, 3, 9, 10, 11};
-  for (uint8_t p : outs) { digitalWrite(p, LOW); pinMode(p, OUTPUT); }
+  benchOutputsLow();
   TCCR3A = _BV(WGM31);
   TCCR3B = _BV(WGM33) | _BV(WGM32) | _BV(CS30);
   ICR3 = 639;
@@ -54,11 +60,18 @@ void setup() {
   PCIFR = _BV(PCIF0);
   PCICR |= _BV(PCIE0);
   Serial.begin(115200);
-  Serial.println(F("# 09_pump2  commands: p<pct> 0 r n   (loop must be filled)"));
+  benchBanner(F("09_pump2"));
+  Serial.println(F("BTN1 short: on/+10 | BTN2 short: -10 | BTN1 long: ramp | BTN2 long: off  (loop must be filled)"));
   Serial.print(F("S1 adc ")); Serial.println(analogRead(A0));
+  benchButtonsBegin();
 }
 
 void loop() {
+  benchButtonsUpdate();
+  if (btn1.shortPress) { ramp = false; start(on ? duty + 10 : 50); }
+  if (btn2.shortPress && on) { ramp = false; start(duty > 10 ? duty - 10 : 10); }
+  if (btn1.longPress) { ramp = true; rampAt = millis(); start(20); }
+  if (btn2.longPress) stop();
   while (Serial.available()) {
     char c = Serial.read();
     if (c == 'p') { ramp = false; start(constrain(Serial.parseInt(), 1, 100)); }
@@ -71,6 +84,7 @@ void loop() {
     if (duty >= 100) { ramp = false; Serial.println(F("ramp done")); }
     else start(duty + 10);
   }
+
   static uint32_t last;
   if (millis() - last < 1000) return;
   uint32_t dt = millis() - last;
@@ -82,7 +96,7 @@ void loop() {
   uint32_t rpm = p * 30000UL / dt;
   if (on && millis() - onAt > 3000 && rpm == 0) {
     if (!zeroSince) zeroSince = millis();
-    if (millis() - zeroSince > 5000) Serial.print(F("STALL "));
+    if (millis() - zeroSince > 5000) { Serial.print(F("STALL ")); benchLed(150, 0, 0); }
   } else {
     zeroSince = 0;
   }

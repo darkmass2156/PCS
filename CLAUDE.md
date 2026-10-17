@@ -30,6 +30,10 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - Bench tests: `tests/NN_name/NN_name.ino` (each one standalone)
   - Firmware: `firmware/controller/controller.ino`
 - Every bench test prints to Serial at 115200. Vlad pastes the output back.
+- Every bench test is driven by **BTN1/BTN2** (breadboard buttons to GND work: tests use INPUT_PULLUP);
+  the button map is in the sketch header and printed at boot. Serial commands stay as a backup.
+- Shared bench code is `tests/common/bench.h` (canonical, `BENCH_VERSION`); each test folder holds an
+  identical copy. Same for `softi2c.*` (canonical in `firmware/controller/`) and `layout.h` (canonical in firmware).
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
   Everything else (SHT3x, soft I2C) is in-tree.
@@ -159,7 +163,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   No full-screen clears (they flicker).
 - **Self-heal**: uptime heartbeat; non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min.
   The RGB LED stays the authoritative status.
-- **Layout (rev 2)**: mode/state + heartbeat, T1, T2, T_set, T_out, cooling potential (ΔT, W once K_POT is set),
+- **Layout**: geometry lives in `firmware/controller/layout.h`, one block per variant. Tune it on the panel
+  with `tests/11_ui_dev` and paste the block it prints ('p').
+- **Fields (rev 2)**: mode/state + heartbeat, T1, T2, T_set, T_out, cooling potential (ΔT, W once K_POT is set),
   T_room, DP, P2 (PWM % + rpm, or OFF), V1 (OPEN/SHUT), V2 angle (`?` when not homed), active fault in red,
   "NO 12V" when the PC is off.
 
@@ -267,16 +273,18 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
     Only possible while the PC is on.
 
 ## Status and logging
-- Status LED (PROPOSAL, implemented provisionally — table in `led.cpp`):
+- Status LED (`ui.cpp`), decided by Vlad 2026-10-17:
   | State | LED |
   |---|---|
-  | 12V absent | off |
-  | Mode 1 | dim amber |
-  | Mode 2 sleep / run | dim green / green |
-  | Mode 3 sleep / run | dim blue / blue |
-  | Homing, start, stop | slow white blink |
-  | Alarm | state colour with a yellow flash each second |
-  | Latched fault | fast red blink |
+  | Mode 1 | white, slow breathing (4 s) |
+  | Mode 2 | blue, slow breathing |
+  | Mode 3 | red, slow breathing |
+  | Mode change | 3 fast green pulses (750 ms), then the new mode's colour |
+  | 12V absent | off (ASSUMED; green pulses still show on a mode press) |
+  | Latched fault | fast red blink 4 Hz (ASSUMED) |
+  | Alarm | 100 ms yellow flash every 2 s over the breathing (ASSUMED) |
+  - Liveness: the LED is computed from `millis()` in `loop()` only (no timer/ISR). A hung loop freezes the
+    LED at its current brightness; the 2 s watchdog then resets (LED off) and breathing resumes after boot.
 - Serial CSV at 1 Hz. `#` lines are comments (version banner, header). Columns:
   `ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms`
   (fuses/faults/alarms as hex bitmasks, see `control.h`).
@@ -295,6 +303,17 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 8. `07_valve` — direction, t_full open/close, backlash, homing
 9. `08_solenoid`
 10. `09_pump2`
+11. `10_v2_calibration` — t_open/t_close (button-marked), backlash, indicator linearity, and on the filled
+    loop the flow characteristic f(θ) = (T1 − T2)/(T1 − T3). Output → V2 tunables and the θ equation.
+12. `11_ui_dev` — screen layout tool (scenarios, grid, colours, live layout edits, draw timings).
+
+### Trimpot test build
+- `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the
+  NTC terminals. R 0…10k maps linearly to −30…+50 °C (≈ 3.2 °C/turn). < 50 Ω = short, unplugged = open
+  (both raise the NTC fault). Calibration offsets are ignored. Banner and display heartbeat show SIM.
+- For a breadboard without Board 1 / P2: `SIM_FORCE_12V 1` (S1–S3 present) and `SIM_FAKE_P2_TACH 1`
+  (3000 rpm while PEN is on). Only honoured with `NTC_TRIMPOT_SIM 1`. Never ship a SIM build.
+- DP still needs at least one real SHT3x (or the system sits in SAFE with "NO DP").
 
 ### Bench checks required by logic rev 2
 1. **δ**: run Mode 1 at idle for 30 min, then set δ = (T1 − T_room) + 1.5 °C.
@@ -321,11 +340,13 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
 - NTCs: `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C
 - `LONG_PRESS_MS` = 2000, `WDT_ENABLE` = 1
+- Bench build: `NTC_TRIMPOT_SIM` = 0, `SIM_T_MIN_C` = −30, `SIM_T_MAX_C` = 50, `SIM_SHORT_OHM` = 50,
+  `SIM_FORCE_12V` = 0, `SIM_FAKE_P2_TACH` = 0
 - `FREEZE_GUARD_C` = −20 (PROPOSAL, unused)
 
 ## Open items
 - OPEN: freeze guard behaviour (PROPOSAL, not implemented)
 - TBD (bench): NTC Beta, V2 direction + travel + backlash, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT, final display size
 - Confirm ASSUMED items: T_out definition, wake needs feasibility, Mode 3 degraded behaviour, fault order kept
-  for faults, T1 backstop alarm-only with P2 off, fault latching, LED scheme
+  for faults, T1 backstop alarm-only with P2 off, fault latching, LED overlays (12V absent / fault / alarm)
 - Docs: BOM rev 4b sheet has no line for the SHT30 (already owned); RAM block is Bykski in the BOM and IceMan on the schematic.

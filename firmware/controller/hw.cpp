@@ -101,6 +101,9 @@ void hwUpdateTach(uint32_t now) {
   rpmFan1 = (uint16_t)((f1 * 30000UL) / dt);
   rpmFan2 = (uint16_t)((f2 * 30000UL) / dt);
   rpmPump = (uint16_t)((p * 30000UL) / dt);
+#if NTC_TRIMPOT_SIM && SIM_FAKE_P2_TACH
+  if (hwPen()) rpmPump = 3000;
+#endif
 }
 
 static const uint8_t fusePins[3] = {PIN_S1, PIN_S2, PIN_S3};
@@ -112,6 +115,9 @@ static uint32_t v12ChangeAt;
 void hwUpdateFuses(uint32_t now) {
   for (uint8_t i = 0; i < 3; i++) {
     uint16_t a = analogRead(fusePins[i]);
+#if NTC_TRIMPOT_SIM && SIM_FORCE_12V
+    a = 1023;
+#endif
     fuseAdc[i] = a;
     bool raw = fuseRaw[i];
     if (a >= FUSE_PRESENT_ADC) raw = true;

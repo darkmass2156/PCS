@@ -5,11 +5,14 @@
 //   - bars top to bottom read RED, GREEN, BLUE (else 'b' toggles BGR)
 //   - background black, text white (else 'i' toggles invert)
 //   - the counter ticks every second for 10+ minutes, including after 'x' (re-init without clear)
-// Commands: i invert, b BGR, x re-init (2 MHz sequence, no clear), f full redraw.
+// Buttons: BTN1 short = invert, BTN2 short = BGR, BTN1 long = re-init (no clear), BTN2 long = full redraw.
+// Serial: i invert, b BGR, x re-init (2 MHz sequence, no clear), f full redraw.
+// For layout work use tests/11_ui_dev; this sketch only proves the panel, cable and colours.
 
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#include "bench.h"
 
 #define DISPLAY_VARIANT 1   // 1 = MSP1691 240x280, 2 = MSP1901 170x320
 
@@ -53,10 +56,11 @@ void drawPattern() {
 }
 
 void setup() {
-  const uint8_t outs[] = {22, 24, 26, 28, 2, 3, 9, 10, 11};
-  for (uint8_t p : outs) { digitalWrite(p, LOW); pinMode(p, OUTPUT); }
+  benchOutputsLow();
   Serial.begin(115200);
-  Serial.print(F("# 06_display variant ")); Serial.println(DISPLAY_VARIANT);
+  benchBanner(F("06_display"));
+  Serial.print(F("variant ")); Serial.println(DISPLAY_VARIANT);
+  benchButtonsBegin();
   uint32_t t0 = millis();
   tft.init(W, H);
   tft.setSPISpeed(2000000);
@@ -66,8 +70,15 @@ void setup() {
 }
 
 void loop() {
-  while (Serial.available()) {
-    char c = Serial.read();
+  benchButtonsUpdate();
+  char b = 0;
+  if (btn1.shortPress) b = 'i';
+  if (btn2.shortPress) b = 'b';
+  if (btn1.longPress) b = 'x';
+  if (btn2.longPress) b = 'f';
+  while (b || Serial.available()) {
+    char c = b ? b : Serial.read();
+    b = 0;
     if (c == 'i') { inv = !inv; tft.invertDisplay(inv); drawPattern(); }
     if (c == 'b') { bgr = !bgr; initSeq(); drawPattern(); }
     if (c == 'x') { uint32_t t = millis(); initSeq(); Serial.print(F("re-init ms ")); Serial.println(millis() - t); }
