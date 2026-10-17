@@ -34,9 +34,13 @@ def build(name, path, size, chars):
         ch = '°' if code == 127 else chr(code)
         if ch not in chars:
             widths.append(0); offs.append(len(bits)); continue
-        adv = max(1, round(font.getlength(ch)))
+        # cell = advance, widened to hold ink that overhangs it (oblique digits lean 2-5 px past their
+        # advance; cut at the advance, the next glyph's cell would paint over it and the last one is clipped)
+        bb = font.getbbox(ch, anchor='ls')
+        lpad = max(0, -bb[0])
+        adv = max(1, round(font.getlength(ch)), bb[2]) + lpad
         im = Image.new('L', (adv, h), 0)
-        ImageDraw.Draw(im).text((0, -top), ch, font=font, fill=255, anchor='ls')
+        ImageDraw.Draw(im).text((lpad, -top), ch, font=font, fill=255, anchor='ls')
         px = im.load()
         lv = [min(3, (px[x, y] * 4) // 256) for y in range(h) for x in range(adv)]
         offs.append(len(bits))

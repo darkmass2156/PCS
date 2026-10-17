@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.4.3 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.3` |
 | 2026-10-17 | 0.4.2 | 5 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.2` |
 | 2026-10-17 | 0.4.1 | 4 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.1` |
 | 2026-10-17 | 0.4.0 | 3 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.0` |
@@ -21,6 +22,17 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.3, DISP rev 6 — 2026-10-17
+Host-rendered with `tools/ui_preview`; host syntax check of `11_ui_dev`. Not yet compiled for AVR. Boot animation unchanged.
+
+### Fixed
+- Mode 2 big numbers clipped on the right: the oblique digits lean 2–5 px past their advance width and the
+  glyph cell was cut at the advance (the next glyph painted over the overhang, the last one lost it).
+  `make_fonts.py` now widens each cell to hold all its ink; regenerated `fonts.h` (all fonts, 1 px on a few
+  DejaVu glyphs like T/Y/r).
+- `11_ui_dev` played all three penguins and the ROG sequence three times before the UI (0.4.2 Wokwi startup
+  loop). Back to one boot sequence per startup; the rotation across resets stays.
 
 ## FW 0.4.2, DISP rev 5 — 2026-10-17
 Host-rendered with `tools/ui_preview` (now with a 2 MHz SPI time model); host syntax check of firmware and

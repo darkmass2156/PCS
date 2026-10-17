@@ -10,8 +10,8 @@
 //   BTN2 long   replay the boot sequence (next penguin)
 // Penguins rotate hobo -> sit -> bow on every boot sequence AND across resets (EEPROM addr 3, the same byte
 // the firmware uses for "last shown"), so opening the serial monitor (DTR reset) doesn't always show the hobo.
-// Wokwi (DISP_TARGET_ILI9341_SIM 1) starts with a blank EEPROM every run, so there all three play back to back
-// at startup.
+// One penguin per startup, then the UI. Wokwi starts with a blank EEPROM every run, so there it is always the
+// hobo first: BTN2 long (or serial s / p0 p1 p2) for the others.
 // Serial: 1 2 3 = mode, n = next scenario, s = boot sequence, p0 p1 p2 = boot with that penguin, ? = help.
 
 #include <SPI.h>
@@ -40,7 +40,7 @@ Adafruit_ST7789 tft(49, 53, -1);
 BootSplash splash;
 Screens screens;
 UiData d;
-uint8_t mode = 1, scen, penguin, bootsLeft;
+uint8_t mode = 1, scen, penguin;
 bool animate;
 const char *const SCEN_NAMES[] = {"normal", "cold + changed", "fault", "no 12V"};
 
@@ -118,7 +118,6 @@ void setup() {
   initPanel();
   screens.begin(&tft, W, H, "ui-dev");
   scenario();
-  bootsLeft = DISP_TARGET_ILI9341_SIM ? SPLASH_COUNT - 1 : 0;
   boot();
 }
 
@@ -134,21 +133,18 @@ void loop() {
   if (c == 'm') mode = mode % 3 + 1;
   if (c >= '1' && c <= '3') mode = c - '0';
   if (c == 'n') { scen = (scen + 1) % 4; Serial.print(F("scenario: ")); Serial.println(SCEN_NAMES[scen]); scenario(); }
-  if (c == 's') { bootsLeft = 0; boot(); }
+  if (c == 's') boot();
   if (c == 'p') {   // p0 / p1 / p2
     uint32_t t = millis();
     while (!Serial.available() && millis() - t < 500) {}
     char k = Serial.read();
-    if (k >= '0' && k < '0' + SPLASH_COUNT) { penguin = k - '0'; bootsLeft = 0; boot(); }
+    if (k >= '0' && k < '0' + SPLASH_COUNT) { penguin = k - '0'; boot(); }
   }
   if (c == '?') help();
   if (c == 'm' || (c >= '1' && c <= '3')) { d.mode = mode; Serial.print(F("mode ")); Serial.println(mode); }
 
   if (splash.active()) {
-    if (splash.update(now) && bootsLeft) {
-      bootsLeft--;
-      boot();
-    }
+    splash.update(now);
     return;
   }
 
