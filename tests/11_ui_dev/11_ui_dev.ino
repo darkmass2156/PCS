@@ -8,10 +8,9 @@
 //   BTN2 short  next scenario (normal, cold + changed values, fault, no 12V)
 //   BTN1 long   animate on/off (temperatures drift every second -> partial redraws)
 //   BTN2 long   replay the boot sequence (next penguin)
-// Penguins rotate hobo -> sit -> bow on every boot sequence AND across resets (EEPROM addr 3, the same byte
-// the firmware uses for "last shown"), so opening the serial monitor (DTR reset) doesn't always show the hobo.
-// One penguin per startup, then the UI. Wokwi starts with a blank EEPROM every run, so there it is always the
-// hobo first: BTN2 long (or serial s / p0 p1 p2) for the others.
+// One penguin per startup, then the UI. The startup penguin is picked like the firmware does it: random
+// (seeded from ADC noise + micros), never the one shown last (EEPROM addr 3). Works on a fresh Wokwi run too,
+// where EEPROM is blank. BTN2 long then cycles hobo -> sit -> bow.
 // Serial: 1 2 3 = mode, n = next scenario, s = boot sequence, p0 p1 p2 = boot with that penguin, ? = help.
 
 #include <SPI.h>
@@ -112,9 +111,13 @@ void setup() {
   benchBanner(F("11_ui_dev"));
   help();
   benchButtonsBegin();
-  randomSeed(analogRead(A3));
+  uint32_t seed = micros();
+  for (uint8_t i = 0; i < 32; i++) seed = (seed << 1) ^ (seed >> 31) ^ (analogRead(A3 + i % 3) & 3);  // ADC noise
+  randomSeed(seed);
   uint8_t last = EEPROM.read(3);   // 0xFF on a blank EEPROM
-  penguin = last < SPLASH_COUNT ? (last + 1) % SPLASH_COUNT : 0;
+  penguin = random(SPLASH_COUNT);
+  if (last < SPLASH_COUNT && penguin == last) penguin = (penguin + 1 + random(SPLASH_COUNT - 1)) % SPLASH_COUNT;
+  Serial.print(F("seed 0x")); Serial.println(seed, HEX);
   initPanel();
   screens.begin(&tft, W, H, "ui-dev");
   scenario();

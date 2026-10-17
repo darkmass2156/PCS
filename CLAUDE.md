@@ -204,9 +204,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
   drawn by `ftxt()` through one address window per field with the background filled (no flicker, no RAM
   buffer). Each glyph cell holds all its ink (oblique overhang included). ~12 KB flash. Used in all three modes (the built-in 5x7 font is left only in the splash version line).
 - **Tools**: `tests/11_ui_dev` runs the real screens and boot sequence on the panel with fake data (buttons switch
-  mode/scenario). One penguin per startup, then the UI; penguins rotate per boot sequence and across resets
-  (EEPROM addr 3; Wokwi EEPROM is blank every run, so there it starts with the hobo); BTN2 long or serial
-  `s` / `p0` `p1` `p2` for the others. `tools/ui_preview/run.sh` renders the same code on the host into `docs/display/preview_*.png`
+  mode/scenario). One penguin per startup, then the UI, picked like the firmware (random from
+  ADC noise, never the last one shown, EEPROM addr 3); BTN2 long or serial `s` / `p0` `p1` `p2` for the others. `tools/ui_preview/run.sh` renders the same code on the host into `docs/display/preview_*.png`
   (look-alike 5x7 font; AA fonts, layout and colours exact; SPI time modelled at 2 MHz for the boot timeline).
 
 ## Hydraulics (matches rev11 schematic)

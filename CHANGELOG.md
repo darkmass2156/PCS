@@ -23,6 +23,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 ---
 
+## BENCH 1.2 fix — 2026-10-17 (no FW change)
+### Fixed
+- `11_ui_dev` still always opened with the hobo in Wokwi: the startup penguin came from an EEPROM rotation, and
+  Wokwi starts every run with a blank EEPROM. Now picked like the firmware (random, seeded from ADC noise +
+  micros, never the last one shown). The seed is printed at boot.
+
 ## FW 0.4.3, DISP rev 6 — 2026-10-17
 Host-rendered with `tools/ui_preview`; host syntax check of `11_ui_dev`. Not yet compiled for AVR. Boot animation unchanged.
 
