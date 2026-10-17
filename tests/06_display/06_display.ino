@@ -14,12 +14,13 @@
 #include <Adafruit_ST7789.h>
 #include "bench.h"
 
-#define DISPLAY_VARIANT 1   // 1 = MSP1691 240x280, 2 = MSP1901 170x320
+#define DISPLAY_VARIANT 1   // 1 = MSP1691 (landscape 280x240), 2 = MSP1901 (landscape 320x170)
+#define ROTATION 1          // 3 = landscape upside down
 
 #if DISPLAY_VARIANT == 1
-const uint16_t W = 240, H = 280;
+const uint16_t IW = 240, IH = 280, W = 280, H = 240;   // init with the native portrait size
 #else
-const uint16_t W = 170, H = 320;
+const uint16_t IW = 170, IH = 320, W = 320, H = 170;
 #endif
 
 Adafruit_ST7789 tft(49, 53, -1);
@@ -32,8 +33,9 @@ void initSeq() {
   tft.sendCommand(ST77XX_COLMOD, &colmod, 1); delay(10);
   tft.sendCommand(ST77XX_NORON);   delay(10);
   tft.sendCommand(ST77XX_DISPON);  delay(10);
-  tft.setRotation(0);
-  if (bgr) { uint8_t m = 0xC0 | 0x08; tft.sendCommand(ST77XX_MADCTL, &m, 1); }
+  tft.setRotation(ROTATION);
+  const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
+  if (bgr) { uint8_t m = madctl[ROTATION & 3] | 0x08; tft.sendCommand(ST77XX_MADCTL, &m, 1); }
   tft.invertDisplay(inv);
 }
 
@@ -41,17 +43,17 @@ void drawPattern() {
   tft.fillScreen(ST77XX_BLACK);
   tft.drawRect(0, 0, W, H, ST77XX_WHITE);
   uint16_t bh = 30;
-  tft.fillRect(10, 40, W - 20, bh, ST77XX_RED);
-  tft.fillRect(10, 40 + bh + 5, W - 20, bh, ST77XX_GREEN);
-  tft.fillRect(10, 40 + 2 * (bh + 5), W - 20, bh, ST77XX_BLUE);
+  tft.fillRect(10, 30, W - 20, bh, ST77XX_RED);
+  tft.fillRect(10, 30 + bh + 5, W - 20, bh, ST77XX_GREEN);
+  tft.fillRect(10, 30 + 2 * (bh + 5), W - 20, bh, ST77XX_BLUE);
   tft.setTextSize(2);
   tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
   tft.setCursor(10, 10);
   tft.print(W); tft.print('x'); tft.print(H);
-  tft.setCursor(10, 160);
+  tft.setCursor(10, 136);
   tft.print(F("R G B ^"));
   tft.setTextSize(1);
-  tft.setCursor(10, 190);
+  tft.setCursor(10, 156);
   tft.print(F("inv ")); tft.print(inv); tft.print(F(" bgr ")); tft.print(bgr);
 }
 
@@ -62,7 +64,7 @@ void setup() {
   Serial.print(F("variant ")); Serial.println(DISPLAY_VARIANT);
   benchButtonsBegin();
   uint32_t t0 = millis();
-  tft.init(W, H);
+  tft.init(IW, IH);
   tft.setSPISpeed(2000000);
   initSeq();
   drawPattern();
@@ -91,7 +93,7 @@ void loop() {
   uint32_t t = micros();
   tft.setTextSize(3);
   tft.setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-  tft.setCursor(10, 220);
+  tft.setCursor(W - 90, 6);
   tft.print(last / 1000);
   t = micros() - t;
   Serial.print(F("tick ")); Serial.print(last / 1000); Serial.print(F(" draw us ")); Serial.println(t);

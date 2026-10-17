@@ -1,32 +1,38 @@
-// 11_ui_dev — design the controller screen on the real panel.
+// 11_ui_dev — design the controller screen on the real panel (display software rev 1: landscape).
 // Draws the firmware layout (same field table and drawing as firmware/controller/display.cpp) with
-// fake data, lets you change the layout live over Serial, and prints a layout.h block to paste back
-// into firmware/controller/layout.h. Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
+// fake data, lets you change it live over Serial, prints a layout.h block to paste back into
+// firmware/controller/layout.h, and replays the boot splashes.
+// Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
+// Copies here: layout.h, splash.h, boot_sprite.h (canonical in firmware/controller/).
 //
 // Buttons:
 //   BTN1 short  next scenario (RUN, SLEEP, NO 12V, SAFE + fault, alarm, worst-case widths)
-//   BTN2 short  next page: layout / layout + grid / colours + font sizes
+//               on the splash page: next penguin
+//   BTN2 short  next page: layout / layout + grid / colours + fonts / boot splash
 //   BTN1 long   animate on/off (values change every second -> exercises partial redraw like the firmware)
 //   BTN2 long   non-blocking re-init (SWRESET, no clear) -> the screen must not blank
 // Serial (each change redraws):
-//   r<px> row height   t<px> top   x<px> value x   l<px> label x   d<px> label dy
-//   z<n> value text size (1-3)     w<n> value width (chars)
-//   o<field>,<row>  move a field to a row (fields: 0 mode 1 heartbeat 2 T1 3 T2 4 Tset 5 Tout 6 dTpot
-//                   7 Room 8 DP 9 P2 10 V1 11 V2 12 message)
-//   p  print layout.h block   m  print draw timings   ?  help
+//   r<px> row height   t<px> top   d<px> label dy   z<n> value text size (1-3)
+//   o<field>,<row>                       move a field to a row
+//   c<field>,<labelX>,<valueX>,<width>   place a field (width in chars)
+//   fields: 0 mode 1 heartbeat 2 T1 3 T2 4 Tset 5 Tout 6 dTpot 7 Room 8 DP 9 P2 10 V1 11 V2 12 message
+//   p  print layout.h block   m  print draw timings   s  replay splash   ?  help
 
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
 #include "bench.h"
 
-#define DISPLAY_VARIANT 1   // 1 = MSP1691 240x280, 2 = MSP1901 170x320
+#define DISPLAY_VARIANT 1   // 1 = MSP1691 280x240 landscape, 2 = MSP1901 320x170 landscape
+#define DISP_ROTATION 1     // 3 = landscape upside down
 #define DISP_INVERT 1
 #define DISP_BGR 0
-#include "layout.h"         // copy of firmware/controller/layout.h
+#include "layout.h"
+#include "splash.h"
 
 const uint16_t W = LAYOUT_W, H = LAYOUT_H;
 Adafruit_ST7789 tft(49, 53, -1);
+BootSplash splash;
 
 const uint16_t BG = ST77XX_BLACK, C_LABEL = 0x8410, C_VALUE = ST77XX_WHITE;
 const uint16_t C_FAULT = ST77XX_RED, C_ALARM = ST77XX_YELLOW;
@@ -36,9 +42,9 @@ const char *const LABELS[FD_COUNT] = {NULL, NULL, "T1", "T2", "Tset", "Tout", "d
 const char *const FNAMES[FD_COUNT] = {"mode", "heartbeat", "T1", "T2", "Tset", "Tout", "dTpot", "Room", "DP", "P2", "V1", "V2", "message"};
 
 // Live layout (starts from layout.h)
-int16_t top = LAYOUT_TOP, rowH = LAYOUT_ROW_H, labelX = LAYOUT_LABEL_X, labelDy = LAYOUT_LABEL_DY;
-int16_t valueX = LAYOUT_VALUE_X, valueSize = LAYOUT_VALUE_SIZE, valueW = LAYOUT_VALUE_W;
-uint8_t rows[FD_COUNT] = LAYOUT_ROWS;
+struct FieldDef { uint8_t row; uint16_t labelX; uint16_t valueX; uint8_t width; };
+FieldDef fields[FD_COUNT] = LAYOUT_FIELDS;
+int16_t top = LAYOUT_TOP, rowH = LAYOUT_ROW_H, labelDy = LAYOUT_LABEL_DY, valueSize = LAYOUT_VALUE_SIZE;
 
 // ---------------- fake data ----------------
 struct Scenario {
@@ -57,11 +63,12 @@ const Scenario SCEN[] = {
    C_FAULT, C_FAULT},
   {"alarm", {"M3 RUN", "", "33.0", "14.2", "13.9", "-1.5", "34.5", "21.8", "9.9 x2", "80% 3080", "OPEN", "88.0\xF8 >", "DP SPREAD"},
    ST77XX_CYAN, C_ALARM},
-  {"worst case", {"M3 START", "", "-25.5", "-25.5", "-25.5", "-25.5", "55.5 1234W", "-25.5", "-25.5 x3", "100% 4800", "OPEN", "90.0\xF8? >", "M3 DEGRADED"},
+  {"worst case", {"M3 START", "", "-25.5", "-25.5", "-25.5", "-25.5", "55 1234W", "-25.5", "-25.5 x3", "100% 4800", "OPEN", "90.0\xF8? >", "M3 DEGRADED"},
    ST77XX_CYAN, C_ALARM},
 };
 const uint8_t N_SCEN = sizeof(SCEN) / sizeof(SCEN[0]);
-uint8_t scen, page;
+const uint8_t PAGES = 4;
+uint8_t scen, page, penguin;
 bool animate;
 char val[FD_COUNT][24];
 uint16_t color[FD_COUNT];
@@ -79,26 +86,17 @@ void loadScenario() {
 }
 
 // ---------------- drawing (mirrors display.cpp) ----------------
-int16_t fieldX(uint8_t f) {
-  if (f == FD_MODE || f == FD_MSG) return labelX;
-  if (f == FD_HEART) return W - 4 - 6 * 8;
-  return valueX;
-}
+int16_t fieldX(uint8_t f) { return f == FD_HEART ? W - 4 - 6 * 8 : fields[f].valueX; }
 uint8_t fieldSize(uint8_t f) { return f == FD_HEART ? 1 : valueSize; }
-uint8_t fieldWidth(uint8_t f) {
-  if (f == FD_HEART) return 8;
-  if (f == FD_MODE) return 9;
-  if (f == FD_MSG) return (W - 2 * labelX) / (6 * valueSize);
-  return valueW;
-}
+uint8_t fieldWidth(uint8_t f) { return f == FD_HEART ? 8 : fields[f].width; }
 
 void drawField(uint8_t f) {
   uint32_t t0 = micros();
-  int16_t y = top + rows[f] * rowH;
+  int16_t y = top + fields[f].row * rowH;
   if (LABELS[f]) {
     tft.setTextSize(1);
     tft.setTextColor(C_LABEL, BG);
-    tft.setCursor(labelX, y + labelDy);
+    tft.setCursor(fields[f].labelX, y + labelDy);
     tft.print(LABELS[f]);
   }
   char b[32];
@@ -112,18 +110,21 @@ void drawField(uint8_t f) {
   tft.print(b);
   fieldUs[f] = micros() - t0;
   if (fieldUs[f] > maxPassUs) maxPassUs = fieldUs[f];
-  // overflow warning: text past the right edge or the bottom
+  // warnings: past the right/bottom edge, value text longer than its field
   int16_t right = fieldX(f) + 6 * fieldSize(f) * w;
   if (right > W || y + 8 * fieldSize(f) > H) {
-    Serial.print(F("WARN ")); Serial.print(FNAMES[f]); Serial.print(F(" overflows: right ")); Serial.print(right);
+    Serial.print(F("WARN ")); Serial.print(FNAMES[f]); Serial.print(F(" off screen: right ")); Serial.print(right);
     Serial.print(F(" bottom ")); Serial.println(y + 8 * fieldSize(f));
+  }
+  if (strlen(val[f]) > w) {
+    Serial.print(F("WARN ")); Serial.print(FNAMES[f]); Serial.print(F(" truncated: \"")); Serial.print(val[f]);
+    Serial.print(F("\" > ")); Serial.print(w); Serial.println(F(" chars"));
   }
 }
 
 void drawGrid() {
   for (uint8_t r = 0; top + r * rowH < H; r++) tft.drawFastHLine(0, top + r * rowH, W, 0x2104);
-  tft.drawFastVLine(valueX, 0, H, 0x0210);
-  tft.drawFastVLine(labelX, 0, H, 0x2104);
+  for (uint8_t f = 0; f < FD_COUNT; f++) if (f != FD_HEART) tft.drawFastVLine(fields[f].valueX, 0, H, 0x0210);
   tft.drawRect(0, 0, W, H, 0x4208);
 }
 
@@ -138,17 +139,24 @@ void drawColours() {
     tft.setCursor(40, 8 + i * 18);
     tft.print(cn[i]);
   }
-  int16_t y = 4 + 9 * 18 + 6;
+  int16_t y = 4;
   for (uint8_t s = 1; s <= 3; s++) {
     tft.setTextSize(s);
     tft.setTextColor(C_VALUE, BG);
-    tft.setCursor(4, y);
-    tft.print(F("-25.5\xF8 8"));
-    y += 8 * s + 4;
+    tft.setCursor(120, y);
+    tft.print(F("-25.5\xF8"));
+    y += 8 * s + 6;
   }
 }
 
+void startSplash() {
+  tft.fillScreen(BG);
+  splash.begin(&tft, W, H, penguin, millis());
+  Serial.print(F("splash ")); Serial.print(penguin); Serial.print('/'); Serial.println(SPLASH_COUNT);
+}
+
 void fullRedraw() {
+  if (page == 3) { startSplash(); return; }
   tft.fillScreen(BG);
   if (page == 2) { drawColours(); return; }
   if (page == 1) drawGrid();
@@ -156,6 +164,16 @@ void fullRedraw() {
 }
 
 // ---------------- init / re-init ----------------
+void applyOrientation() {
+  tft.setRotation(DISP_ROTATION);
+  if (DISP_BGR) {
+    const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
+    uint8_t m = madctl[DISP_ROTATION & 3] | 0x08;
+    tft.sendCommand(ST77XX_MADCTL, &m, 1);
+  }
+  tft.invertDisplay(DISP_INVERT);
+}
+
 void initSeqBlocking() {
   uint8_t colmod = 0x55;
   tft.sendCommand(ST77XX_SWRESET); delay(150);
@@ -163,9 +181,7 @@ void initSeqBlocking() {
   tft.sendCommand(ST77XX_COLMOD, &colmod, 1); delay(10);
   tft.sendCommand(ST77XX_NORON);   delay(10);
   tft.sendCommand(ST77XX_DISPON);  delay(10);
-  tft.setRotation(0);
-  if (DISP_BGR) { uint8_t m = 0xC8; tft.sendCommand(ST77XX_MADCTL, &m, 1); }
-  tft.invertDisplay(DISP_INVERT);
+  applyOrientation();
 }
 
 int8_t reinitStep = -1;
@@ -180,9 +196,7 @@ void reinitUpdate(uint32_t now) {
     case 3: tft.sendCommand(ST77XX_NORON); reinitWait = now + 10; break;
     case 4: tft.sendCommand(ST77XX_DISPON); reinitWait = now + 10; break;
     default:
-      tft.setRotation(0);
-      if (DISP_BGR) { uint8_t m = 0xC8; tft.sendCommand(ST77XX_MADCTL, &m, 1); }
-      tft.invertDisplay(DISP_INVERT);
+      applyOrientation();
       reinitStep = -1;
       dirty = (1 << FD_COUNT) - 1;
       Serial.println(F("re-init done (no clear) - did the screen blank?"));
@@ -193,18 +207,21 @@ void reinitUpdate(uint32_t now) {
 void printLayout() {
   Serial.println(F("--- replace this variant's block in firmware/controller/layout.h ---"));
   Serial.print(F("#if DISPLAY_VARIANT == ")); Serial.println(DISPLAY_VARIANT);
+  Serial.print(F("#define LAYOUT_INIT_W     ")); Serial.println(LAYOUT_INIT_W);
+  Serial.print(F("#define LAYOUT_INIT_H     ")); Serial.println(LAYOUT_INIT_H);
   Serial.print(F("#define LAYOUT_W          ")); Serial.println(W);
   Serial.print(F("#define LAYOUT_H          ")); Serial.println(H);
   Serial.print(F("#define LAYOUT_TOP        ")); Serial.println(top);
   Serial.print(F("#define LAYOUT_ROW_H      ")); Serial.println(rowH);
-  Serial.print(F("#define LAYOUT_LABEL_X    ")); Serial.println(labelX);
   Serial.print(F("#define LAYOUT_LABEL_DY   ")); Serial.println(labelDy);
-  Serial.print(F("#define LAYOUT_VALUE_X    ")); Serial.println(valueX);
   Serial.print(F("#define LAYOUT_VALUE_SIZE ")); Serial.println(valueSize);
-  Serial.print(F("#define LAYOUT_VALUE_W    ")); Serial.println(valueW);
-  Serial.print(F("#define LAYOUT_ROWS       {"));
-  for (uint8_t f = 0; f < FD_COUNT; f++) { Serial.print(rows[f]); if (f + 1 < FD_COUNT) Serial.print(F(", ")); }
-  Serial.println('}');
+  Serial.println(F("#define LAYOUT_FIELDS { \\"));
+  for (uint8_t f = 0; f < FD_COUNT; f++) {
+    Serial.print(F("  {")); Serial.print(fields[f].row); Serial.print(F(", ")); Serial.print(fields[f].labelX);
+    Serial.print(F(", ")); Serial.print(fields[f].valueX); Serial.print(F(", ")); Serial.print(fields[f].width);
+    Serial.print(f + 1 < FD_COUNT ? F("},") : F("} }"));
+    Serial.print(F("   /* ")); Serial.print(FNAMES[f]); Serial.println(f + 1 < FD_COUNT ? F(" */ \\") : F(" */"));
+  }
   Serial.println(F("---"));
 }
 
@@ -215,8 +232,8 @@ void printTimings() {
 }
 
 void help() {
-  Serial.println(F("BTN1 short: scenario | BTN2 short: page | BTN1 long: animate | BTN2 long: re-init"));
-  Serial.println(F("serial: r t x l d z w <n>, o<field>,<row>, p print layout, m timings"));
+  Serial.println(F("BTN1 short: scenario/penguin | BTN2 short: page | BTN1 long: animate | BTN2 long: re-init"));
+  Serial.println(F("serial: r t d z <n>, o<f>,<row>, c<f>,<labelX>,<valueX>,<width>, p print, m timings, s splash"));
 }
 
 void handleSerial() {
@@ -226,25 +243,25 @@ void handleSerial() {
   switch (c) {
     case 'r': rowH = Serial.parseInt(); break;
     case 't': top = Serial.parseInt(); break;
-    case 'x': valueX = Serial.parseInt(); break;
-    case 'l': labelX = Serial.parseInt(); break;
     case 'd': labelDy = Serial.parseInt(); break;
     case 'z': valueSize = constrain(Serial.parseInt(), 1, 3); break;
-    case 'w': valueW = constrain(Serial.parseInt(), 1, 20); break;
     case 'o': {
       int f = Serial.parseInt(), r = Serial.parseInt();
-      if (f >= 0 && f < FD_COUNT) rows[f] = r;
+      if (f >= 0 && f < FD_COUNT) fields[f].row = r;
       break;
     }
+    case 'c': {
+      int f = Serial.parseInt(), lx = Serial.parseInt(), vx = Serial.parseInt(), w = Serial.parseInt();
+      if (f >= 0 && f < FD_COUNT) { fields[f].labelX = lx; fields[f].valueX = vx; fields[f].width = constrain(w, 1, 30); }
+      break;
+    }
+    case 's': page = 3; break;
     case 'p': printLayout(); redraw = false; break;
     case 'm': printTimings(); redraw = false; break;
     case '?': help(); redraw = false; break;
     default: redraw = false;
   }
   if (redraw) {
-    Serial.print(F("rowH ")); Serial.print(rowH); Serial.print(F(" top ")); Serial.print(top);
-    Serial.print(F(" valueX ")); Serial.print(valueX); Serial.print(F(" size ")); Serial.print(valueSize);
-    Serial.print(F(" width ")); Serial.println(valueW);
     maxPassUs = 0;
     fullRedraw();
   }
@@ -257,7 +274,7 @@ void setup() {
   Serial.print(F("variant ")); Serial.print(DISPLAY_VARIANT); Serial.print(' '); Serial.print(W); Serial.print('x'); Serial.println(H);
   help();
   benchButtonsBegin();
-  tft.init(W, H);
+  tft.init(LAYOUT_INIT_W, LAYOUT_INIT_H);
   tft.setSPISpeed(2000000);
   initSeqBlocking();
   tft.cp437(true);
@@ -271,14 +288,20 @@ void loop() {
   handleSerial();
 
   if (btn1.shortPress) {
-    scen = (scen + 1) % N_SCEN;
-    Serial.print(F("scenario ")); Serial.println(SCEN[scen].name);
-    loadScenario();
-    if (page == 2) { page = 0; fullRedraw(); }
+    if (page == 3) {
+      penguin = (penguin + 1) % SPLASH_COUNT;
+      startSplash();
+    } else {
+      scen = (scen + 1) % N_SCEN;
+      Serial.print(F("scenario ")); Serial.println(SCEN[scen].name);
+      loadScenario();
+      if (page == 2) { page = 0; fullRedraw(); }
+    }
   }
   if (btn2.shortPress) {
-    page = (page + 1) % 3;
-    Serial.println(page == 0 ? F("page: layout") : page == 1 ? F("page: layout + grid") : F("page: colours + fonts"));
+    page = (page + 1) % PAGES;
+    const char *const names[PAGES] = {"layout", "layout + grid", "colours + fonts", "boot splash"};
+    Serial.print(F("page: ")); Serial.println(names[page]);
     fullRedraw();
   }
   if (btn1.longPress) { animate = !animate; Serial.println(animate ? F("animate on") : F("animate off")); }
@@ -286,6 +309,10 @@ void loop() {
 
   reinitUpdate(now);
   if (reinitStep >= 0 || page == 2) return;
+  if (page == 3) {
+    if (splash.active() && splash.update(now)) Serial.println(F("splash done (BTN1: next penguin, s: replay)"));
+    return;
+  }
 
   static uint32_t lastSec;
   if (now - lastSec >= 1000) {

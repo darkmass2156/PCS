@@ -25,7 +25,9 @@ static uint32_t lastLogAt;
 static void printHeader() {
   Serial.print(F("# PCS controller fw " FW_VERSION " logic rev "));
   Serial.print(LOGIC_REV);
-  Serial.print(F(" hw " HW_REV " display variant "));
+  Serial.print(F(" hw " HW_REV " display rev "));
+  Serial.print(DISPLAY_REV);
+  Serial.print(F(" variant "));
   Serial.println(DISPLAY_VARIANT);
 #if NTC_TRIMPOT_SIM
   Serial.print(F("# SIM BUILD: NTC inputs are trimpots"));

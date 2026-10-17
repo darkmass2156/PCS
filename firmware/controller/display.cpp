@@ -10,6 +10,7 @@
 #include <math.h>
 
 #include "layout.h"
+#include "splash.h"
 
 static const uint16_t W = LAYOUT_W, H = LAYOUT_H;
 
@@ -27,10 +28,10 @@ enum Field : uint8_t {
 };
 
 struct FieldDef {
-  uint8_t x;
-  uint8_t size;
+  uint8_t row;
+  uint16_t labelX;
+  uint16_t valueX;
   uint8_t width;      // chars, padded so stale text is overwritten
-  const char *label;  // NULL = no label
 };
 
 #if NTC_TRIMPOT_SIM
@@ -38,23 +39,10 @@ static const uint8_t HB_W = 9;    // "SIM mm:ss"
 #else
 static const uint8_t HB_W = 8;    // "hh:mm:ss"
 #endif
-static const uint8_t VX = LAYOUT_VALUE_X, VS = LAYOUT_VALUE_SIZE, VW = LAYOUT_VALUE_W;
-static const FieldDef fields[FD_COUNT] = {
-  {LAYOUT_LABEL_X, VS, 9, NULL},
-  {(uint8_t)(W - 4 - 6 * HB_W), 1, HB_W, NULL},
-  {VX, VS, VW, "T1"},
-  {VX, VS, VW, "T2"},
-  {VX, VS, VW, "Tset"},
-  {VX, VS, VW, "Tout"},
-  {VX, VS, VW, "dTpot"},
-  {VX, VS, VW, "Room"},
-  {VX, VS, VW, "DP"},
-  {VX, VS, VW, "P2"},
-  {VX, VS, VW, "V1"},
-  {VX, VS, VW, "V2"},
-  {LAYOUT_LABEL_X, VS, (uint8_t)((W - 2 * LAYOUT_LABEL_X) / (6 * VS)), NULL},
-};
-static const uint8_t rows[FD_COUNT] = LAYOUT_ROWS;
+static const FieldDef fields[FD_COUNT] = LAYOUT_FIELDS;
+static const char *const labels[FD_COUNT] = {
+  NULL, NULL, "T1", "T2", "Tset", "Tout", "dTpot", "Room", "DP", "P2", "V1", "V2", NULL};
+static BootSplash splash;
 
 static char val[FD_COUNT][21];
 static uint16_t color[FD_COUNT];
@@ -92,18 +80,35 @@ static void sendStep(uint8_t i) {
   else tft.sendCommand(initSeq[i].cmd);
 }
 
+// Random splash per boot. lastSplash survives warm resets (not power cycles), so a reset never
+// shows the same penguin twice in a row.
+static uint8_t lastSplash __attribute__((section(".noinit")));
+
+static uint8_t pickSplash() {
+  uint32_t seed = micros();
+  for (uint8_t i = 0; i < 16; i++) seed = (seed << 1) ^ (analogRead(PIN_T3 + (i % 3)) & 1);  // ADC LSB noise
+  randomSeed(seed);
+  uint8_t n = random(SPLASH_COUNT);
+  if (lastSplash < SPLASH_COUNT && n == lastSplash) n = (n + 1 + random(SPLASH_COUNT - 1)) % SPLASH_COUNT;
+  lastSplash = n;
+  return n;
+}
+
 void displayInit() {
-  tft.init(W, H);                 // runs at the library default clock ...
+  tft.init(LAYOUT_INIT_W, LAYOUT_INIT_H);   // native portrait size, at the library default clock ...
   tft.setSPISpeed(DISP_SPI_HZ);   // ... so redo it at 2 MHz for the long cable
   for (uint8_t i = 0; i < INIT_STEPS; i++) {
     sendStep(i);
     delay(initSeq[i].waitMs);
   }
-  applyOrientation();
+  applyOrientation();               // DISP_ROTATION 1/3 -> landscape W x H
   tft.fillScreen(BG);
   tft.cp437(true);
   dirty = (1 << FD_COUNT) - 1;
   lastReinitAt = millis();
+#if BOOT_SPLASH
+  splash.begin(&tft, W, H, pickSplash(), lastReinitAt);
+#endif
 }
 
 // ---------------- values ----------------
@@ -175,7 +180,7 @@ static void computeValues(uint32_t now) {
   if (st.tOutOk && ntcT1.valid) {
     float pot = ntcT1.c - st.tOut;
     fmtC(t, pot, true);
-    if (K_POT > 0) snprintf(b, sizeof(b), "%s %ldW", t, (long)(K_POT * pot));
+    if (K_POT > 0) snprintf(b, sizeof(b), "%d %ldW", (int)lround(pot), (long)(K_POT * pot));  // fits 8 chars
     else strcpy(b, t);
   } else {
     strcpy(b, "--");
@@ -213,23 +218,36 @@ static void computeValues(uint32_t now) {
 
 static void drawField(uint8_t f) {
   const FieldDef &d = fields[f];
-  int16_t y = LAYOUT_TOP + rows[f] * LAYOUT_ROW_H;
-  if (d.label) {
+  int16_t y = LAYOUT_TOP + d.row * LAYOUT_ROW_H;
+  uint8_t size = f == FD_HEART ? 1 : LAYOUT_VALUE_SIZE;
+  uint8_t width = f == FD_HEART ? HB_W : d.width;
+  int16_t x = f == FD_HEART ? W - 4 - 6 * HB_W : d.valueX;
+  if (labels[f]) {
     tft.setTextSize(1);
     tft.setTextColor(C_LABEL, BG);
-    tft.setCursor(LAYOUT_LABEL_X, y + LAYOUT_LABEL_DY);
-    tft.print(d.label);
+    tft.setCursor(d.labelX, y + LAYOUT_LABEL_DY);
+    tft.print(labels[f]);
   }
-  char b[24];
-  snprintf(b, sizeof(b), "%-*s", d.width, val[f]);
-  b[d.width] = 0;
-  tft.setTextSize(d.size);
+  char b[32];
+  if (width > sizeof(b) - 1) width = sizeof(b) - 1;
+  snprintf(b, sizeof(b), "%-*s", width, val[f]);
+  b[width] = 0;
+  tft.setTextSize(size);
   tft.setTextColor(color[f], BG);
-  tft.setCursor(d.x, y);
+  tft.setCursor(x, y);
   tft.print(b);
 }
 
 void displayUpdate(uint32_t now) {
+  // Boot splash first, one small step per call; then the dashboard from a black screen.
+  if (splash.active()) {
+    if (splash.update(now)) {
+      dirty = (1 << FD_COUNT) - 1;
+      lastValuesAt = now - 1000;
+      lastReinitAt = now;
+    }
+    return;
+  }
   // Non-blocking re-init, one command per call.
   if (initStep >= 0) {
     if ((int32_t)(now - initWaitUntil) < 0) return;

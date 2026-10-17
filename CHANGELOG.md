@@ -2,19 +2,39 @@
 
 Newest first. Each entry says which revision it belongs to:
 **FW** = firmware (`firmware/controller/version.h`), **LOGIC** = control logic rev,
-**HW** = hardware rev, **SCH** = schematic rev, **BENCH** = bench sketches (`tests/common/bench.h`),
+**HW** = hardware rev, **SCH** = schematic rev, **DISP** = display software rev (`DISPLAY_REV`),
+**BENCH** = bench sketches (`tests/common/bench.h`),
 **DOC** = documentation only.
 Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the authoritative spec.
 
 ## Revision index
-| Date | FW | Bench | Logic | HW | Schematic | Git tag |
-|---|---|---|---|---|---|---|
-| 2026-10-17 | 0.2.0 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.2.0` |
-| 2026-10-17 | 0.1.0 | 1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
-| 2026-10-17 | — | — | 2 | 4b + CS mod + SHT30 | rev11 | `logic-r2` |
-| 2026-10-17 | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
+| Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
+|---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.3.0 | 1 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.0` |
+| 2026-10-17 | 0.2.0 | — | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.2.0` |
+| 2026-10-17 | 0.1.0 | — | 1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
+| 2026-10-17 | — | — | — | 2 | 4b + CS mod + SHT30 | rev11 | `logic-r2` |
+| 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.3.0, DISP rev 1 — 2026-10-17
+First display-software revision. Host syntax check of both variants; the splash was rendered on a simulated
+280x240 framebuffer (all three penguins, animation and clear verified). Not yet compiled for AVR.
+
+### Added
+- Boot splash: three original Pingu-style penguins (hobo, sit, bow), one at random per boot, never the same twice
+  across warm resets. Each noots twice (beak → trumpet / O-lips) in ~3 s, non-blocking, then clears to black.
+- `tools/sprites/make_pingu.py` generates `boot_sprite.h` (RLE, 16-colour palettes, beak patches) and
+  `docs/display/pingu_preview.png`.
+- `DISPLAY_REV` in `version.h`, printed in the banner.
+
+### Changed
+- Display is landscape: 280x240 on the 1.69" (in use), 320x170 on the 1.9". `DISP_ROTATION` = 1.
+- `layout.h` is now per field {row, labelX, valueX, width}: header row, two columns of five, message row.
+- `11_ui_dev`: new layout format (`c` command places a field), truncation warnings, splash replay page.
+- `06_display`: landscape, positions fit both variants.
+- dTpot with K_POT shows whole degrees ("28 450W") to fit the column.
 
 ## FW 0.2.0 + BENCH 1.1 — 2026-10-17
 Still not compiled for AVR in the build session (host syntax check of both firmware variants,

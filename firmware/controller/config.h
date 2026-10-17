@@ -32,7 +32,8 @@
 #define DISP_SPI_HZ     2000000UL
 #define DISP_INVERT     1          // flip if colours look negative
 #define DISP_BGR        0          // set if red and blue are swapped
-#define DISP_ROTATION   0
+#define DISP_ROTATION   1          // landscape (layout.h W x H); 3 = landscape upside down
+#define BOOT_SPLASH     1          // penguin "noot noot" splash at boot (non-blocking, ~3 s)
 #define DISP_REINIT_MS  300000UL
 
 // ---------------- Setpoint and margins (°C) ----------------
