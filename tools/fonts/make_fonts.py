@@ -2,7 +2,7 @@
 """Generates firmware/controller/fonts.h: anti-aliased (2 bits/pixel, 4 levels) proportional bitmap fonts
 for scr_gfx.cpp ftxt(). Chars 32..126, and slot 127 holds the degree sign (code 0xF8 in strings, cp437 style).
 Run from the repo root:  python3 tools/fonts/make_fonts.py   (then copy fonts.h into tests/11_ui_dev)
-Fonts: DejaVu Sans (Bitstream Vera licence) and GNU FreeSans (GPL with font exception)."""
+Fonts: DejaVu Sans / Sans Mono (Bitstream Vera licence) and GNU FreeSans (GPL with font exception)."""
 import os, sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -14,7 +14,9 @@ NUM = list(' +-.0123456789') + ['°']
 FONTS = [  # name, ttf, px size, charset
     ('F_LABEL', DJ + 'DejaVuSans.ttf', 10, ALL),
     ('F_VALUE', DJ + 'DejaVuSans-Bold.ttf', 15, ALL),
-    ('F_BIG', FF + 'FreeSansBold.ttf', 33, NUM),
+    ('F_BIG', FF + 'FreeSansBold.ttf', 33, NUM),            # Mode 1 big temperatures
+    ('F_SPORT', FF + 'FreeSansBoldOblique.ttf', 34, NUM),   # Mode 2 big temperatures (slanted)
+    ('F_MONO', DJ + 'DejaVuSansMono.ttf', 11, ALL),         # Mode 3, 7 px per char
 ]
 
 def build(name, path, size, chars):

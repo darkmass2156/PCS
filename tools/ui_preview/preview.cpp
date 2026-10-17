@@ -35,14 +35,20 @@ int main(int argc, char **argv) {
   for (int k = 0; k < 3; k++) {
     BootSplash sp;
     tft.fillScreen(0);
-    sp.begin(&tft, 280, 240, k, "0.4.0", false, 0);
-    struct { uint32_t t; const char *name; } shots[] = {{1150, "noot"}, {2650, "glitch_a"}, {2870, "glitch_b"},
-                                                         {3060, "glitch_c"}, {3230, "glitch_d"}, {3700, "rog_scan"},
-                                                         {4400, "rog"}};
+    sp.begin(&tft, 280, 240, k, "0.4.2", false, 0);
+    struct { uint32_t t; const char *name; } shots[] = {{1150, "noot"}, {2310, "glitch_a"}, {2440, "glitch_b"},
+                                                         {2650, "glitch_c"}, {2900, "glitch_d"}, {3350, "rog_scan"},
+                                                         {4300, "rog"}};
     const int NSHOT = 7;
     int si = 0;
-    for (uint32_t now = 0; now < 9000; now += 10) {
+    tft.busyUs = 0;
+    double clk = 0;   // ms; the loop pass is ~1 ms plus whatever the draw step costs on the SPI bus
+    for (uint32_t now = 0; now < 15000; now = (uint32_t)clk) {
+      tft.busyUs = 0;
+      uint8_t ph = sp.phase();
       sp.update(now);
+      if (sp.phase() != ph) printf("  boot %d: phase %d at %u ms\n", k, sp.phase(), now);
+      clk += 1 + tft.busyUs / 1000.0;
       if (si < NSHOT && now >= shots[si].t) {
         tft.savePPM((OUT + "/boot" + std::to_string(k) + "_" + shots[si].name + ".ppm").c_str());
         si++;
@@ -52,7 +58,7 @@ int main(int argc, char **argv) {
   }
   // ---- dashboards ----
   static Screens s;   // static like the firmware's
-  s.begin(&tft, 280, 240, "v0.4.0");
+  s.begin(&tft, 280, 240, "v0.4.2");
   uint32_t now = 100000;
   UiData d = base();
   for (int i = 0; i < 230; i++) {   // chart history: valve cooling towards T_set

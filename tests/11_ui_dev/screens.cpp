@@ -2,6 +2,10 @@
 #include <math.h>
 
 // ---------------- helpers ----------------
+// Mode 3 chart: frame at y 178..226, plot rows CH_TOP..CH_BOT
+#define CH_TOP 179
+#define CH_BOT 225
+
 static uint32_t hs(const char *s, uint32_t h = 2166136261UL) {
   while (*s) {
     h ^= (uint8_t)*s++;
@@ -69,6 +73,12 @@ static const char *potText(char *out, const UiData &d) {
   return out;
 }
 
+// Mode 3 text: monospaced, `chars` cells of 7 px (fixed fields, like the old 6x8 grid).
+static void mono(int16_t x, int16_t y, uint16_t fg, uint16_t bg, const char *s, uint8_t chars, char align = 'l') {
+  ftxt(F_MONO, x, y, fg, bg, s, chars * 7, align);
+}
+static const char *const CHIP2[3] = {"EXT", "V2", "FAN"};   // Mode 2 chips
+
 static const char *const FAULT_NAMES[] = {
   "NTC T1", "NTC T2", "NTC T3", "NO DEW POINT", "T2 LOW", "T1 LOW", "FUSE P2", "FUSE VALVES", "P2 STALL"};
 
@@ -120,7 +130,6 @@ void Screens::update(uint32_t t, const UiData &d) {
         phase = mode == 3 ? CHART : LIVE;
         step = 0;
         memset(cache, 0, sizeof(cache));
-        memset(segPrev, 0, sizeof(segPrev));
         memset(barPrev, 0xFF, sizeof(barPrev));
         stripKind = 0;
         next = 0;
@@ -130,7 +139,7 @@ void Screens::update(uint32_t t, const UiData &d) {
       for (uint8_t k = 0; k < 17 && step < CHART_W; k++) chartColumn(step++);
       if (step >= CHART_W) {
         drawnSamples = samples;
-        gfx->drawFastVLine(5 + samples % CHART_W, 161, 65, C_DG);
+        gfx->drawFastVLine(5 + samples % CHART_W, CH_TOP, CH_BOT - CH_TOP + 1, C_DG);
         phase = LIVE;
       }
       return;
@@ -155,9 +164,9 @@ static uint8_t enc(float v) {
   if (isnan(v)) return 0;
   return clampi(lround((v + 10) * 5), 1, 250);
 }
-static int16_t chartY(uint8_t e) {   // 0..35 °C over rows 161..225
+static int16_t chartY(uint8_t e) {   // 0..35 °C over rows CH_TOP..CH_BOT
   float v = e / 5.0f - 10;
-  return clampi(lround(225 - v * 64 / 35), 161, 225);
+  return clampi(lround(CH_BOT - v * (CH_BOT - CH_TOP) / 35), CH_TOP, CH_BOT);
 }
 
 void Screens::sample(const UiData &d) {
@@ -170,9 +179,9 @@ void Screens::sample(const UiData &d) {
 
 void Screens::chartColumn(uint16_t c) {
   int16_t x = 5 + c;
-  gfx->drawFastVLine(x, 161, 65, C_WHT);
+  gfx->drawFastVLine(x, CH_TOP, CH_BOT - CH_TOP + 1, C_WHT);
   if (c % 2 == 0)
-    for (uint8_t q = 1; q < 4; q++) gfx->drawPixel(x, 161 + q * 16, C_LG);
+    for (uint8_t q = 1; q < 4; q++) gfx->drawPixel(x, CH_TOP + q * (CH_BOT - CH_TOP) / 4, C_LG);
   bool has = samples > c || samples >= CHART_W;
   if (!has) return;
   uint16_t head = (samples - 1) % CHART_W;
@@ -264,18 +273,18 @@ uint32_t Screens::bottomStrip2(const UiData &d, bool draw) {
   if (!draw) return k;
   if (kind != stripKind) {
     gfx->fillRect(0, 209, W, 27, kind == 1 ? C_BLK : kind == 2 ? C_DG : C_RED);
-    if (kind == 1) txt(4, 216, 1, C_WHT, C_BLK, "TO DEW", 6);
+    if (kind == 1) ftxt(F_LABEL, 4, 217, C_WHT, C_BLK, "TO DEW", 0);
     barPrev[3] = 0xFF;
     stripKind = kind;
   }
   if (kind == 1) {
     slantBar(3, 46, 213, 140, 14, 12, lit, 0, 2, false, true);
-    txt(W - 4 - 72, 212, 2, lit < 2 ? C_HOT : C_WHT, C_BLK, b, 6, 'r');
+    ftxt(F_VALUE, W - 4 - 76, 214, lit < 2 ? C_HOT : C_WHT, C_BLK, b, 76, 'r');
   } else if (kind == 2) {
-    txt(4, 215, 2, C_WHT, C_DG, "NO 12V - PC OFF", 22, 'c');
+    ftxt(F_VALUE, 4, 214, C_WHT, C_DG, "NO 12V  -  PC OFF", 272, 'c');
   } else {
     snprintf(t, sizeof(t), "FAULT: %s", f);
-    txt(4, 215, 2, C_WHT, C_RED, t, 22, 'c');
+    ftxt(F_VALUE, 4, 214, C_WHT, C_RED, t, 272, 'c');
   }
   return k;
 }
@@ -325,32 +334,31 @@ bool Screens::staticStep(uint16_t i) {
       case 0:
         gfx->fillRect(0, 0, 100, 15, C_WHT);
         gfx->fillTriangle(100, 0, 111, 0, 100, 14, C_WHT);
-        txt(6, 4, 1, C_BLK, C_WHT, "SPORT", 5);
+        ftxt(F_LABEL, 6, 3, C_BLK, C_WHT, "SPORT", 0);
         for (uint8_t k = 0; k < 3; k++) fillSlant(106 + k * 9, 0, 5, 15, 0.6f, k == 2 ? C_HOT : C_DG);
         return true;
       case 1:
         for (uint8_t r = 0; r < 3; r++) {
           int16_t y0 = 22 + r * 38;
-          txt(4, y0, 1, C_LG, C_BLK, LAB[r], 13);
-          txt(266, y0 + 2, 1, C_LG, C_BLK, "\xF8" "C", 2);
+          ftxt(F_LABEL, 4, y0, C_LG, C_BLK, LAB[r], 0);
+          ftxt(F_LABEL, 264, y0 + 3, C_LG, C_BLK, "\xF8" "C", 0);
         }
         return true;
       case 2:
         gfx->drawFastHLine(0, 137, W, C_DG);
         gfx->drawFastHLine(0, 169, W, C_DG);
-        txt(4, 141, 1, C_WHT, C_BLK, "CASE", 4);
-        txt(144, 141, 1, C_WHT, C_BLK, "ROOM", 4);
-        txt(4, 177, 1, C_LG, C_BLK, "COOLING", 7);
+        ftxt(F_LABEL, 4, 141, C_LG, C_BLK, "CASE", 0);
+        ftxt(F_LABEL, 144, 141, C_LG, C_BLK, "ROOM", 0);
+        ftxt(F_LABEL, 4, 176, C_LG, C_BLK, "COOLING", 0);
         return true;
       case 3: {
-        static const char *const T[3] = {"EXT", "VALVE", "FAN"};
         for (uint8_t k = 0; k < 3; k++) {
           int16_t x0 = 4 + k * 92;
           gfx->drawLine(x0 + 6, 191, x0 + 88, 191, C_DG);
           gfx->drawLine(x0 + 88, 191, x0 + 82, 206, C_DG);
           gfx->drawLine(x0 + 82, 206, x0, 206, C_DG);
           gfx->drawLine(x0, 206, x0 + 6, 191, C_DG);
-          txt(x0 + 10, 195, 1, C_LG, C_BLK, T[k], 5);
+          ftxt(F_LABEL, x0 + 9, 194, C_LG, C_BLK, CHIP2[k], 0);
         }
         gfx->fillRect(0, 237, W, 2, C_MAR);
         return true;
@@ -358,54 +366,54 @@ bool Screens::staticStep(uint16_t i) {
     }
     return false;
   }
-  // mode 3
+  // mode 3: DejaVu Sans Mono 11 px, 7 px per char, 12 rows
   switch (i) {
     case 0:
       gfx->fillRect(0, 0, W, 14, C_MAR);
-      txt(3, 3, 1, C_WHT, C_MAR, "PROCESS CONTROL", 15);
-      txt(W - 3 - 6 * strlen(ver), 3, 1, C_LG, C_MAR, ver, strlen(ver));
+      mono(3, 1, C_WHT, C_MAR, "PROCESS CONTROL", 15);
+      mono(W - 3 - 7 * strlen(ver), 1, C_LG, C_MAR, ver, strlen(ver));
       return true;
     case 1:   // P&ID: T1 -> P2 -> V1 -> rad (T3) -> V2 <- bypass; V2 -> T2 -> PC
-      gfx->drawRect(4, 20, 40, 12, C_BLK);
-      gfx->drawFastHLine(44, 26, 16, C_BLK);
-      gfx->drawCircle(66, 26, 6, C_BLK);
-      gfx->drawFastHLine(72, 26, 20, C_BLK);
-      gfx->drawTriangle(92, 20, 92, 32, 104, 26, C_BLK);
-      gfx->drawTriangle(116, 20, 116, 32, 104, 26, C_BLK);
-      gfx->drawFastHLine(116, 26, 14, C_BLK);
-      gfx->drawRect(130, 20, 35, 12, C_BLK);
-      gfx->drawFastVLine(147, 32, 27, C_BLK);
-      gfx->drawLine(147, 58, 116, 66, C_BLK);
-      gfx->drawFastVLine(66, 32, 35, C_BLK);
-      gfx->drawFastHLine(66, 66, 26, C_BLK);
-      gfx->drawTriangle(92, 60, 92, 72, 104, 66, C_BLK);
-      gfx->drawTriangle(116, 60, 116, 72, 104, 66, C_BLK);
-      gfx->fillTriangle(98, 80, 110, 80, 104, 66, C_WHT);
-      gfx->drawTriangle(98, 80, 110, 80, 104, 66, C_BLK);
-      gfx->drawFastVLine(104, 80, 12, C_BLK);
-      gfx->drawRect(84, 92, 40, 12, C_BLK);
-      txt(6, 34, 1, C_DG, C_LG, "T1 ret", 6);
-      txt(61, 34, 1, C_DG, C_LG, "P2", 2);
-      txt(98, 34, 1, C_DG, C_LG, "V1", 2);
-      txt(130, 34, 1, C_DG, C_LG, "T3 rad", 6);
-      txt(70, 56, 1, C_DG, C_LG, "byp", 3);
-      txt(128, 94, 1, C_DG, C_LG, "T2>PC", 5);
+      gfx->drawRect(2, 18, 36, 14, C_BLK);          // T1 box
+      gfx->drawFastHLine(38, 25, 4, C_BLK);
+      gfx->drawCircle(48, 25, 6, C_BLK);            // P2
+      gfx->drawFastHLine(54, 25, 10, C_BLK);
+      gfx->drawTriangle(64, 19, 64, 31, 76, 25, C_BLK);   // V1
+      gfx->drawTriangle(88, 19, 88, 31, 76, 25, C_BLK);
+      gfx->drawFastHLine(88, 25, 8, C_BLK);
+      gfx->drawRect(96, 18, 38, 14, C_BLK);         // T3 box (rad)
+      gfx->drawFastVLine(48, 31, 43, C_BLK);        // bypass down from P2
+      gfx->drawFastHLine(48, 74, 16, C_BLK);
+      gfx->drawFastVLine(124, 32, 42, C_BLK);       // rad return down
+      gfx->drawFastHLine(88, 74, 36, C_BLK);
+      gfx->drawTriangle(64, 68, 64, 80, 76, 74, C_BLK);   // V2
+      gfx->drawTriangle(88, 68, 88, 80, 76, 74, C_BLK);
+      gfx->fillTriangle(70, 88, 82, 88, 76, 74, C_WHT);
+      gfx->drawTriangle(70, 88, 82, 88, 76, 74, C_BLK);
+      gfx->drawFastVLine(76, 88, 8, C_BLK);
+      gfx->drawRect(57, 96, 38, 14, C_BLK);         // T2 box
+      mono(2, 34, C_DG, C_LG, "T1", 2);
+      mono(41, 34, C_DG, C_LG, "P2", 2);
+      mono(69, 34, C_DG, C_LG, "V1", 2);
+      mono(96, 34, C_DG, C_LG, "T3", 2);
+      mono(51, 58, C_DG, C_LG, "byp", 3);
+      mono(98, 97, C_DG, C_LG, ">PC", 3);
       return true;
     case 2: {
       static const char *const L[10] = {"DP", "MAX", "SET", "OUT", "POT", "P2", "FAN", "FUSE", "FLT", "ALM"};
-      gfx->drawFastVLine(168, 16, 108, C_DG);
-      for (uint8_t k = 0; k < 10; k++) txt(171, 18 + k * 10, 1, C_MAR, C_LG, L[k], 4);
+      gfx->drawFastVLine(139, 16, 120, C_DG);
+      for (uint8_t k = 0; k < 10; k++) mono(143, 16 + k * 12, C_MAR, C_LG, L[k], 4);
       return true;
     }
     case 3:
-      gfx->fillRect(0, 126, W, 25, C_DG);
+      gfx->fillRect(0, 137, W, 27, C_DG);
       return true;
     case 4:
-      txt(4, 152, 1, C_BLK, C_LG, "T2", 2);
-      txt(22, 152, 1, C_HOT, C_LG, "Tset", 4);
-      txt(52, 152, 1, C_MAR, C_LG, "DP", 2);
-      txt(W - 4 - 6 * 19, 152, 1, C_DG, C_LG, "0-35\xF8" "C  1 px = 1 s", 19, 'r');
-      gfx->drawRect(4, 160, 274, 67, C_DG);
+      mono(4, 165, C_BLK, C_LG, "T2", 2);
+      mono(25, 165, C_HOT, C_LG, "Tset", 4);
+      mono(60, 165, C_MAR, C_LG, "DP", 2);
+      mono(W - 4 - 7 * 15, 165, C_DG, C_LG, "0-35\xF8" "C  1px=1s", 15, 'r');
+      gfx->drawRect(4, CH_TOP - 1, 274, CH_BOT - CH_TOP + 3, C_DG);
       return true;
   }
   return false;
@@ -448,17 +456,16 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
   }
 
   if (mode == 2) {
-    static const SegStyle SEG2 = {17, 32, 4, 4, 0.18f};
     if (i == 0) return heartbeat(272, 6, C_WHT, C_DG, draw);
     if (i <= 3) {   // temperature bars, -10..40 °C
       float v = i == 1 ? d.rad : i == 2 ? d.loop : d.valve;
       uint8_t lit = isnan(v) ? 0 : clampi(lround((v + 10) / 5), 0, 10);
       return slantBar(i - 1, 4, 22 + (i - 1) * 38 + 13, 118, 14, 10, lit, 0, 0, true, draw);
     }
-    if (i <= 6) {
+    if (i <= 6) {   // big slanted numbers
       float v = i == 4 ? d.rad : i == 5 ? d.loop : d.valve;
-      seg5(b, v);
-      if (draw) segText(168, 22 + (i - 4) * 38 + 2, SEG2, b, segPrev[i - 4], C_WHT, C_BLK);
+      fmt1(b, v, !isnan(v));
+      if (draw) ftxt(F_SPORT, 140, 22 + (i - 4) * 38 + 5, C_WHT, C_BLK, b, 121, 'r');
       return key(hs(b, i));
     }
     if (i <= 8) {
@@ -467,8 +474,8 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
       fmt1(a, room ? d.roomT : d.caseT, true);
       fmt1(c, room ? d.roomRH : d.caseRH, true);
       fmt1(e, room ? d.roomDP : d.caseDP, true);
-      snprintf(b, sizeof(b), "%s\xF8 %s%% dp %s\xF8", a, c, e);
-      if (draw) txt(room ? 144 : 4, 155, 1, C_WHT, C_BLK, b, 22);
+      snprintf(b, sizeof(b), "%s\xF8  %s%%  dp %s\xF8", a, c, e);
+      if (draw) ftxt(F_LABEL, room ? 144 : 4, 155, C_WHT, C_BLK, b, 132);
       return key(hs(b, i));
     }
     if (i == 9) {   // cooling power meter, 0..1000 W
@@ -477,19 +484,21 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
     }
     if (i == 10) {
       const char *v = potText(t, d);
-      if (draw) txt(W - 4 - 72, 174, 2, C_WHT, C_BLK, v, 6, 'r');
+      if (draw) ftxt(F_VALUE, W - 4 - 76, 172, C_WHT, C_BLK, v, 76, 'r');
       return key(hs(v, i));
     }
     if (i <= 13) {
       uint8_t k = i - 11;
       const char *v = k == 0 ? (d.extOpen ? "OPEN" : "CLOSED") : k == 1 ? valveText(d) : fanText(t, d);
-      uint8_t w = k == 2 ? 7 : 6;
-      if (draw) txt(4 + k * 92 + 80 - w * 6, 195, 1, C_WHT, C_BLK, v, w, 'r');
+      if (draw) {
+        int16_t x0 = 4 + k * 92, vx = x0 + 9 + ftWidth(F_LABEL, CHIP2[k]) + 4;   // value box right of its label
+        ftxt(F_LABEL, vx, 194, C_WHT, C_BLK, v, x0 + 81 - vx, 'r');
+      }
       return key(hs(v, i));
     }
     if (i == 14) return bottomStrip2(d, draw);
     snprintf(b, sizeof(b), "%s%s", d.state, d.sim ? " SIM" : "");   // 15: state in the tab
-    if (draw) txt(42, 4, 1, C_DG, C_WHT, b, 9);
+    if (draw) ftxt(F_LABEL, 46, 3, C_DG, C_WHT, b, 52);
     return key(hs(b, i));
   }
 
@@ -497,58 +506,55 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
   switch (i) {
     case 0:
       snprintf(b, sizeof(b), "M3 %s%s", d.state, d.sim ? " SIM" : "");
-      if (draw) txt(100, 3, 1, C_WHT, C_MAR, b, 12);
+      if (draw) mono(115, 1, C_WHT, C_MAR, b, 14);
       return key(hs(b, i));
     case 1:
-      return heartbeat(W - 3 - 6 * strlen(ver) - 8, 6, C_WHT, C_MAR, draw);
+      return heartbeat(W - 3 - 7 * strlen(ver) - 7, 7, C_WHT, C_MAR, draw);
     case 2:
       fmt1(b, d.loop, !isnan(d.loop));
-      if (draw) txt(6, 22, 1, C_BLK, C_WHT, b, 6, 'c');
+      if (draw) mono(3, 19, C_BLK, C_WHT, b, 4, 'c');   // 28 px inside the 36 px box
       return key(hs(b, i));
     case 3:
       fmt1(b, d.rad, !isnan(d.rad));
       if (draw) {
-        gfx->fillRect(131, 21, 33, 10, C_DG);
-        txt(132, 22, 1, C_WHT, C_DG, b, 5, 'c');
+        gfx->fillRect(97, 19, 36, 12, C_DG);
+        mono(97, 19, C_WHT, C_DG, b, 5, 'c');
       }
       return key(hs(b, i));
     case 4:
       fmt1(b, d.valve, !isnan(d.valve));
       if (draw) {
-        gfx->fillRect(85, 93, 38, 10, C_RED);
-        txt(86, 94, 1, C_WHT, C_RED, b, 6, 'c');
+        gfx->fillRect(58, 97, 36, 12, C_RED);
+        mono(58, 97, C_WHT, C_RED, b, 5, 'c');
       }
       return key(hs(b, i));
     case 5: {   // V1: filled white when open
       uint16_t c = d.extOpen ? C_WHT : C_DG;
       if (draw) {
-        gfx->fillTriangle(93, 22, 93, 30, 102, 26, c);
-        gfx->fillTriangle(115, 22, 115, 30, 106, 26, c);
+        gfx->fillTriangle(65, 21, 65, 29, 74, 25, c);
+        gfx->fillTriangle(87, 21, 87, 29, 78, 25, c);
       }
       return key(c + 11);
     }
     case 6: {   // P2: filled white when running
       uint16_t c = d.p2On ? C_WHT : C_DG;
-      if (draw) {
-        gfx->fillCircle(66, 26, 5, c);
-        gfx->setTextSize(1);
-        gfx->setTextColor(C_BLK);
-        gfx->setCursor(64, 23);
-        gfx->print('P');
-      }
+      if (draw) gfx->fillCircle(48, 25, 5, c);
       return key(c + 13);
     }
     case 7:
       fmt1(t, d.v2deg, d.v2homed);
-      snprintf(b, sizeof(b), "V2 %s\xF8%s", t, d.v2homed ? "" : "?");
-      if (draw) txt(122, 70, 1, C_MAR, C_LG, b, 9);
+      snprintf(b, sizeof(b), "%s\xF8%s", t, d.v2homed ? "" : "?");
+      if (draw) {
+        mono(92, 58, C_DG, C_LG, "V2", 2);
+        mono(92, 78, C_MAR, C_LG, b, 6);
+      }
       return key(hs(b, i));
     case 8: {
       char a[10], c[10];
       fmt1(a, d.tset, !isnan(d.tset));
       signed1(c, d.valve - d.tset, "");
-      snprintf(b, sizeof(b), "Tset %s  dev %s", a, c);
-      if (draw) txt(4, 112, 1, C_BLK, C_LG, b, 26);
+      snprintf(b, sizeof(b), "Tset %s dev %s", a, c);
+      if (draw) mono(2, 120, C_BLK, C_LG, b, 19);
       return key(hs(b, i));
     }
     case 9: case 10: case 11: case 12: case 13: case 14: case 15: case 16: case 17: case 18: {
@@ -568,7 +574,7 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
         case 17: snprintf(b, sizeof(b), "0x%03X", d.faults); break;
         default: snprintf(b, sizeof(b), "0x%03X", d.alarms); break;
       }
-      if (draw) txt(W - 3 - 78, 18 + (i - 9) * 10, 1, (i == 17 && d.faults) ? C_HOT : C_BLK, C_LG, b, 13, 'r');
+      if (draw) mono(W - 3 - 7 * 14, 16 + (i - 9) * 12, (i == 17 && d.faults) ? C_HOT : C_BLK, C_LG, b, 14, 'r');
       return key(hs(b, i));
     }
     case 19:
@@ -578,31 +584,32 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
       fmt1(a, room ? d.roomT : d.caseT, true);
       fmt1(c, room ? d.roomRH : d.caseRH, true);
       fmt1(e, room ? d.roomDP : d.caseDP, true);
-      snprintf(b, sizeof(b), "%s  %s\xF8" "C  %s%%RH  dp %s", room ? "ROOM" : "CASE", a, c, e);
-      if (draw) txt(4, room ? 140 : 129, 1, C_WHT, C_DG, b, 45);
+      snprintf(b, sizeof(b), "%s %s\xF8" "C %s%%RH dp %s\xF8" "C", room ? "ROOM" : "CASE", a, c, e);
+      if (draw) mono(4, room ? 151 : 138, C_WHT, C_DG, b, 38);
       return key(hs(b, i));
     }
     case 21:   // chart: new samples since the last draw, then the sweep cursor
       if (draw) {
         if (samples - drawnSamples >= CHART_W) drawnSamples = samples - CHART_W;
         while (drawnSamples < samples) chartColumn(drawnSamples++ % CHART_W);
-        gfx->drawFastVLine(5 + samples % CHART_W, 161, 65, C_DG);
+        gfx->drawFastVLine(5 + samples % CHART_W, CH_TOP, CH_BOT - CH_TOP + 1, C_DG);
       }
       return key(hn(samples, i));
     default: {   // 22: bottom line, or the fault
       uint8_t n = 0;
       const char *f = faultText(d, n);
-      if (d.faults) snprintf(b, sizeof(b), "FAULT %s (%u)  0x%03X", f, n, d.faults);
+      if (d.faults) snprintf(b, sizeof(b), "FAULT %s (%u) 0x%03X", f, n, d.faults);
       else {
         char a[12], c[10];
         signed1(a, d.dew, "\xF8" "C");
         fmt1(c, d.v2deg, d.v2homed);
-        snprintf(b, sizeof(b), "TO DEW %s  V2 %s\xF8/90  %s", a, c, d.no12v ? "NO 12V" : valveText(d));
+        snprintf(b, sizeof(b), "TO DEW %s  V2 %s\xF8  %s", a, c, d.no12v ? "NO 12V" : valveText(d));
       }
       if (draw) {
         uint16_t bgc = d.faults ? C_RED : C_LG;
-        gfx->fillRect(0, 228, W, 12, bgc);
-        txt(4, 230, 1, d.faults ? C_WHT : C_BLK, bgc, b, 45);
+        gfx->fillRect(0, 227, 4, 13, bgc);
+        gfx->fillRect(4, 239, W - 4, 1, bgc);
+        ftxt(F_MONO, 4, 227, d.faults ? C_WHT : C_BLK, bgc, b, W - 4);
       }
       return key(hs(b, i));
     }

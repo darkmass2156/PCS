@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.4.2 | 5 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.2` |
 | 2026-10-17 | 0.4.1 | 4 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.1` |
 | 2026-10-17 | 0.4.0 | 3 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.0` |
 | 2026-10-17 | 0.3.1 | 2 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.1` |
@@ -20,6 +21,26 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.2, DISP rev 5 — 2026-10-17
+Host-rendered with `tools/ui_preview` (now with a 2 MHz SPI time model); host syntax check of firmware and
+`11_ui_dev`. Not yet compiled for AVR.
+
+### Changed
+- Boot: Pingu → ROG is now a fast crash (~0.8 s on the real bus, boot ~5.3 s). The 0.4.1 glitch was designed
+  for 0.9 s but its full-width redraws took ~3.3 s at 2 MHz, plus 0.5 s to settle. New: crash mid-noot, hardware
+  scroll jolts (free), invert flashes, wrong-colour tears, then the screen breaks up in 20 random bands that each
+  land on their final ROG content (no separate settle pass).
+- Mode 2: big numbers in FreeSans Bold Oblique (replaces the segment digits), labels/values/banner in the
+  Mode 1 DejaVu fonts. Chips read EXT / V2 / FAN.
+- Mode 3: all text in DejaVu Sans Mono 11 px (replaces 5x7); P&ID, table (12 px rows) and chart (0–35 °C over
+  47 rows) re-fitted.
+- `fonts.h`: + F_SPORT, F_MONO (~11.8 KB flash total).
+
+### Fixed
+- `11_ui_dev` always opened with the hobo: the penguin index started at 0 on every reset (and opening the serial
+  monitor resets the Mega). Now rotates across resets via EEPROM addr 3; the Wokwi build plays all three at
+  startup; serial `p0`/`p1`/`p2`.
 
 ## FW 0.4.1, DISP rev 4 — 2026-10-17
 Host-rendered with `tools/ui_preview` (Mode 1 all states, boot frames of all three penguins); host syntax check.

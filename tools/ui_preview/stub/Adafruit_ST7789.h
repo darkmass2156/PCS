@@ -10,9 +10,11 @@ class Adafruit_ST7789 {
   uint16_t fb[FH][FW];
   bool inv = false;
   long windows = 0;
+  // SPI cost model at 2 MHz: 8 us per pixel, ~40 us per address window / command (hardware SPI on the Mega)
+  double busyUs = 0;
   void px(int x, int y, uint16_t c) { if (x >= 0 && x < FW && y >= 0 && y < FH) fb[y][x] = c; }
   void drawPixel(int x, int y, uint16_t c) { px(x, y, c); }
-  void fillRect(int x, int y, int w, int h, uint16_t c) { for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) px(i, j, c); }
+  void fillRect(int x, int y, int w, int h, uint16_t c) { int cw = std::max(0, std::min(x + w, FW) - std::max(x, 0)), ch = std::max(0, std::min(y + h, FH) - std::max(y, 0)); if (cw && ch) busyUs += 40 + 8.0 * cw * ch; for (int j = y; j < y + h; j++) for (int i = x; i < x + w; i++) px(i, j, c); }
   void fillScreen(uint16_t c) { fillRect(0, 0, FW, FH, c); }
   void drawFastHLine(int x, int y, int w, uint16_t c) { fillRect(x, y, w, 1, c); }
   void drawFastVLine(int x, int y, int h, uint16_t c) { fillRect(x, y, 1, h, c); }
@@ -56,13 +58,22 @@ class Adafruit_ST7789 {
   void endWrite() { if (pos != area) { fprintf(stderr, "window not filled %ld/%ld\n", pos, area); exit(1); } }
   void setAddrWindow(int x, int y, int w, int h) {
     if (x < 0 || y < 0 || x + w > FW || y + h > FH) { fprintf(stderr, "window off screen %d,%d %dx%d\n", x, y, w, h); exit(1); }
-    wx = x; wy = y; ww = w; wh = h; pos = 0; area = (long)w * h; windows++;
+    wx = x; wy = y; ww = w; wh = h; pos = 0; area = (long)w * h; windows++; busyUs += 40 + 8.0 * area;
   }
   void writeColor(uint16_t c, uint32_t n) { for (uint32_t i = 0; i < n; i++) { if (pos >= area) { fprintf(stderr, "window overflow\n"); exit(1); } px(wx + pos % ww, wy + pos / ww, c); pos++; } }
-  void invertDisplay(bool i) { inv = i; }
+  void invertDisplay(bool i) { inv = i; busyUs += 10; }
+  // VSCRSADD (0x37): landscape column x shows panel row (x + 20 + scr) % 320; rows outside 20..299 hold
+  // whatever was in the hidden GRAM (power-up noise on the real panel).
+  int scr = 0;
+  void sendCommand(uint8_t cmd, const uint8_t *d = nullptr, uint8_t n = 0) {
+    busyUs += 20 + 8 * n;
+    if (cmd == 0x37 && n == 2) scr = (d[0] << 8) | d[1];
+  }
   void savePPM(const char *path) {
     FILE *f = fopen(path, "wb"); fprintf(f, "P6 %d %d 255\n", FW, FH);
-    for (int y = 0; y < FH; y++) for (int x = 0; x < FW; x++) { uint16_t c = fb[y][x]; if (inv) c = ~c; fputc((c >> 11) << 3, f); fputc(((c >> 5) & 63) << 2, f); fputc((c & 31) << 3, f); }
+    for (int y = 0; y < FH; y++) for (int x = 0; x < FW; x++) {
+      int row = (x + 20 + scr) % 320 - 20;
+      uint16_t c = row >= 0 && row < FW ? fb[y][row] : (uint16_t)((row * 7919 + y * 104729) * 2654435761u >> 7); if (inv) c = ~c; fputc((c >> 11) << 3, f); fputc(((c >> 5) & 63) << 2, f); fputc((c & 31) << 3, f); }
     fclose(f);
   }
 };

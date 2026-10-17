@@ -25,7 +25,6 @@ class Screens {
   uint8_t next;
   uint32_t now;
   uint32_t cache[24];
-  char segPrev[3][8];
   uint8_t barPrev[5];
   uint8_t stripKind;      // what the bottom strip shows now: 0 nothing, 1 dew, 2 no 12V, 3 fault
   const char *ver;

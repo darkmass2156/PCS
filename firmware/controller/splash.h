@@ -1,11 +1,12 @@
 #pragma once
-// Boot sequence, ~6 s, no text except the version under the ROG logo:
-//   1. Pingu: one of the penguins in boot_sprite.h (random per boot) goes "noot noot" twice.
-//   2. Glitch, both ways at once: the penguin tears sideways while torn bands of the ROG logo (rog_logo.h)
-//      cut in; the logo bands take over, their displacement shrinks and the logo locks in. Scanline noise
-//      and two inverted-colour flashes on top.
-//   3. ROG: the logo resolves clean in white, a red scan passes over it, red underline + firmware version,
-//      hold, clear to black for the dashboard.
+// Boot sequence, ~5 s, no text except the version under the ROG logo:
+//   1. Pingu: one of the penguins in boot_sprite.h (random per boot) goes "noot noot".
+//   2. Crash, ~0.8 s, in the middle of the second noot (beak stuck open): the picture jolts sideways (hardware
+//      scroll, so the hidden GRAM rows show as a garbage stripe), inverts, tears in wrong colours; then the
+//      screen falls apart in 12-row bands in random order, each band landing on its final ROG content
+//      (rog_logo.h) while displaced ghost bands of the logo flicker in the rest. Nothing is redrawn twice,
+//      so the whole crash costs about one full-screen write at 2 MHz.
+//   3. ROG: a red scan passes over the white logo, red underline + firmware version, hold, clear to black.
 // Non-blocking: update() does one small drawing step per call, so loop(), the LED heartbeat and
 // the watchdog keep running. Everything streams through address windows (no per-pixel commands).
 // Canonical in firmware/controller/; tests/11_ui_dev has a copy.
@@ -34,10 +35,12 @@ class BootSplash {
     ly = (H - 240) / 2 + ROG_Y0;
     step = BG;
     strip = 0;
+    for (uint8_t i = 0; i < NBANDS; i++) order[i] = i;
     at = now;
   }
 
   bool active() const { return step != DONE; }
+  uint8_t phase() const { return step; }   // for the host preview timeline
 
   // Returns true once the whole sequence has finished and the screen is black again.
   bool update(uint32_t now) {
@@ -56,20 +59,6 @@ class BootSplash {
         break;
       case GLITCH:
         glitch(now);
-        break;
-      case SETTLE:    // clear the margins around the logo box, then the logo clean in white (20 rows/call)
-        if (strip == 0) {
-          tft->fillRect(0, 0, W, ly, 0x0000);
-          tft->fillRect(0, ly + ROG_H, W, H - ly - ROG_H, 0x0000);
-          tft->fillRect(0, ly, lx, ROG_H, 0x0000);
-          tft->fillRect(lx + ROG_W, ly, W - lx - ROG_W, ROG_H, 0x0000);
-        }
-        rog(C_WHT, 0, ROG_W, strip, 20, 0);
-        strip += 20;
-        if (strip >= ROG_H) {
-          strip = 0;
-          next(SWEEP, now);
-        }
         break;
       case SWEEP:     // a red scan, 30 px wide, crosses the white logo; stage = slice number
         if (now - at < 35) break;
@@ -107,7 +96,8 @@ class BootSplash {
   }
 
  private:
-  enum Step : uint8_t { BG, SPRITE, ANIM, GLITCH, SETTLE, SWEEP, ROG_HOLD, CLEAR, DONE };
+  enum Step : uint8_t { BG, SPRITE, ANIM, GLITCH, SWEEP, ROG_HOLD, CLEAR, DONE };
+  static const uint8_t BAND = 12, NBANDS = 20;   // 20 x 12 rows = 240
   Adafruit_ST7789 *tft;
   const SplashSprite *sp;
   const char *ver;
@@ -117,7 +107,9 @@ class BootSplash {
   int16_t sx, sy, lx, ly;
   Step step = DONE;
   uint16_t idx;
-  uint8_t ry, stage;
+  uint8_t ry, stage, done;
+  uint8_t order[NBANDS];   // band resolve order (shuffled); order[0..done) are final
+  bool corrupt;            // blit with wrong colours
   uint32_t at;
 
   void next(Step s, uint32_t now) {
@@ -135,7 +127,11 @@ class BootSplash {
     return true;
   }
 
-  uint16_t color(uint8_t c) const { return c ? pgm_read_word(sp->pal + c) : sp->bg; }
+  uint16_t color(uint8_t c) const {
+    static const uint16_t BAD[4] = {0xF81F, 0x07E0, C_HOT, 0xFFE0};   // magenta, green, red, yellow
+    if (corrupt) return c ? BAD[c & 3] : C_BLK;
+    return c ? pgm_read_word(sp->pal + c) : sp->bg;
+  }
 
   // Streams up to `rows` sprite rows (from where the last call stopped) through ONE address window.
   // Each sprite row is replayed S times for the vertical scale. True when all h rows are done.
@@ -172,80 +168,117 @@ class BootSplash {
     blit(noot ? sp->noot : sp->beak, sx + sp->px * S, sy + sp->py * S, sp->pw, sp->ph, sp->ph);
   }
 
-  // Timeline (ms after the sprite is up): noot 600, back 1000, noot 1250, back 1650, glitch 2300.
+  // Timeline (ms after the sprite is up): noot 600, back 1000, noot 1250, crash 1450 (beak still open).
   void anim(uint32_t now) {
-    static const uint16_t T[] = {600, 1000, 1250, 1650, 2300};
-    if (stage >= 5 || now - at < T[stage]) return;
-    if (stage == 4) {
+    static const uint16_t T[] = {600, 1000, 1250, 1450};
+    if (stage >= 4 || now - at < T[stage]) return;
+    if (stage == 3) {
       next(GLITCH, now);
-      inverted = false;
+      inverted = corrupt = false;
+      done = 0;
+      for (uint8_t i = NBANDS - 1; i > 0; i--) {   // shuffle the band order
+        uint8_t j = random(i + 1), t = order[i];
+        order[i] = order[j];
+        order[j] = t;
+      }
       return;
     }
     beak(stage == 0 || stage == 2);
     stage++;
   }
 
-  // Penguin out, logo in, overlapping. One frame every 45 ms, 20 frames.
-  void tear() {   // a band of sprite rows redrawn shifted sideways
-    uint8_t r0 = random(sp->h), n = 2 + random(6);
-    if (r0 + n > sp->h) n = sp->h - r0;
-    int16_t dx = random(-24, 25);
-    if (sx + dx < 0) dx = -sx;
-    if (sx + dx + sp->w * S > W) dx = W - sx - sp->w * S;
-    tft->fillRect(0, sy + r0 * S, W, n * S, sp->bg);
-    idx = rowOffset(r0);
-    ry = r0;
-    blit(sp->base, sx + dx, sy, sp->w, r0 + n, n);
+  // Hardware vertical scroll (VSCRSADD). Landscape x is the panel's row axis, so this jolts the whole picture
+  // sideways with wrap-around; costs one command. 0 = normal. SWRESET (re-init) also resets it.
+  void scroll(int16_t dx) {
+    uint16_t v = (uint16_t)((dx % 320 + 320) % 320);
+    uint8_t b[2] = {(uint8_t)(v >> 8), (uint8_t)v};
+    tft->sendCommand(0x37, b, 2);
   }
 
-  void logoBand(int16_t amp) {   // a band of logo rows on black, displaced by up to +-amp
-    uint16_t r0 = random(ROG_H), n = 3 + random(10);
-    if (r0 + n > ROG_H) n = ROG_H - r0;
-    tft->fillRect(0, ly + r0, W, n, 0x0000);
-    rog(random(5) ? C_WHT : C_HOT, 0, ROG_W, r0, n, amp ? random(-amp, amp + 1) : 0);
+  void flash(bool on) {
+    tft->invertDisplay(on ? !invNormal : invNormal);
+    inverted = on;
+  }
+
+  // A band of 1-3 sprite rows redrawn shifted sideways (phase 1 only, before any band is final).
+  void tear(bool bad) {
+    uint8_t r0 = random(sp->h), n = 1 + random(3);
+    if (r0 + n > sp->h) n = sp->h - r0;
+    int16_t dx = random(-30, 31), ox = sx + dx, wpx = sp->w * S;
+    if (ox < 0) ox = 0;
+    if (ox + wpx > W) ox = W - wpx;
+    if (ox > sx) tft->fillRect(sx, sy + r0 * S, ox - sx, n * S, sp->bg);                 // uncovered gap
+    if (ox < sx) tft->fillRect(ox + wpx, sy + r0 * S, sx - ox, n * S, sp->bg);
+    corrupt = bad;
+    idx = rowOffset(r0);
+    ry = r0;
+    blit(sp->base, ox, sy, sp->w, r0 + n, n);
+    corrupt = false;
+  }
+
+  // Rows [y0, y0 + n) of the screen intersected with the logo rows, as logo rows (r0, rows). False if none.
+  bool logoRows(int16_t y0, int16_t n, uint16_t &r0, uint16_t &rows) const {
+    int16_t a = y0 > ly ? y0 : ly, b = y0 + n < ly + ROG_H ? y0 + n : ly + ROG_H;
+    if (b <= a) return false;
+    r0 = a - ly;
+    rows = b - a;
+    return true;
+  }
+
+  // Band b to its final ROG content: black, with the logo rows in white.
+  void resolve(uint8_t b) {
+    int16_t y0 = b * BAND;
+    uint16_t r0, rows;
+    if (!logoRows(y0, BAND, r0, rows)) {
+      tft->fillRect(0, y0, W, BAND, C_BLK);
+      return;
+    }
+    if ((int16_t)(ly + r0) > y0) tft->fillRect(0, y0, W, ly + r0 - y0, C_BLK);
+    if (ly + r0 + rows < y0 + BAND) tft->fillRect(0, ly + r0 + rows, W, y0 + BAND - ly - r0 - rows, C_BLK);
+    tft->fillRect(0, ly + r0, lx, rows, C_BLK);
+    tft->fillRect(lx + ROG_W, ly + r0, W - lx - ROG_W, rows, C_BLK);
+    rog(C_WHT, 0, ROG_W, r0, rows, 0);
+  }
+
+  // Scanline noise inside band b (only bands not yet final, so nothing has to be cleaned up later).
+  void noise(uint8_t b) {
+    static const uint16_t NOISE[4] = {C_HOT, C_WHT, C_DG, 0xF81F};
+    int16_t y = b * BAND + random(BAND - 2), x = random(W / 2), w = 30 + random(W);
+    if (x + w > W) w = W - x;
+    tft->fillRect(x, y, w, 1 + random(2), NOISE[random(4)]);
   }
 
   void glitch(uint32_t now) {
-    if (now - at < 45) return;
+    if (now - at < 25) return;
     at = now;
     uint8_t f = stage++;
-    if (inverted) {   // a flash lasts one frame
-      tft->invertDisplay(invNormal);
-      inverted = false;
-    }
-    if (f >= 20) {
-      tft->invertDisplay(invNormal);
-      strip = 0;
-      step = SETTLE;
+    if (inverted) flash(false);   // a flash lasts one frame
+    if (f < 5) {                  // phase 1: the picture breaks
+      scroll(f == 2 ? 0 : (random(2) ? 1 : -1) * (20 + random(60)));
+      tear(f != 1);
+      if (f) tear(random(2));
+      noise(random(NBANDS));
+      if (f == 0 || f == 4) flash(true);
       return;
     }
-    if (f < 12) tear();
-    if (f < 5) tear();
-    if (f >= 5) {
-      uint8_t bands = f < 12 ? 1 + (f - 5) / 3 : 6;
-      int16_t amp = f < 12 ? 40 : (20 - f) * 5;   // displacement shrinks as the logo locks in
-      for (uint8_t k = 0; k < bands; k++) logoBand(amp);
+    if (done >= NBANDS) {         // all bands final: picture back in place
+      scroll(0);
+      flash(false);
+      next(SWEEP, now);
+      return;
     }
-    if (f >= 12) {   // wipe what is left of the penguin above and below the logo rows
-      for (uint8_t k = 0; k < 2; k++) {
-        bool above = random(2);
-        int16_t span = above ? ly : H - ly - ROG_H, h = 8 + random(14);
-        if (span <= 0) continue;
-        int16_t y = (above ? 0 : ly + ROG_H) + random(span);
-        if (h > (above ? ly : H) - y) h = (above ? ly : H) - y;
-        tft->fillRect(0, y, W, h, 0x0000);
-      }
+    // phase 2: two bands land on their final content, a ghost of the logo flickers in one that hasn't
+    uint8_t left = NBANDS - done;
+    scroll(left > 4 ? random(-3 * left, 3 * left + 1) : 0);
+    for (uint8_t k = 0; k < 2 && done < NBANDS; k++) resolve(order[done++]);
+    if (done < NBANDS) {
+      uint8_t b = order[done + random(NBANDS - done)];
+      uint16_t r0, rows;
+      if (logoRows(b * BAND, BAND, r0, rows))
+        rog(random(4) ? C_WHT : C_HOT, 0, ROG_W, r0, rows, random(-4 * left, 4 * left + 1));
+      noise(order[done + random(NBANDS - done)]);
     }
-    static const uint16_t NOISE[4] = {C_HOT, C_WHT, C_DG, C_MAR};
-    for (uint8_t k = 0; k < (f < 16 ? 3 : 1); k++) {   // scanline noise
-      int16_t y = random(H), x = random(W / 2), w = 20 + random(W);
-      if (x + w > W) w = W - x;
-      tft->fillRect(x, y, w, 1 + random(3), NOISE[random(4)]);
-    }
-    if (f == 8 || f == 15) {
-      tft->invertDisplay(!invNormal);
-      inverted = true;
-    }
+    if (f == 9) flash(true);
   }
 
   // Streams logo rows [row0, row0 + rows) restricted to columns [a, b), shifted dx px sideways and clipped
