@@ -7,6 +7,7 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#include <EEPROM.h>
 #include <math.h>
 
 #include "layout.h"
@@ -64,13 +65,27 @@ static const uint8_t INIT_STEPS = sizeof(initSeq) / sizeof(initSeq[0]);
 static int8_t initStep = -1;      // -1 = not re-initialising
 static uint32_t initWaitUntil;
 
+// MADCTL bits
+static const uint8_t MADCTL_MY  = 0x80;
+static const uint8_t MADCTL_MX  = 0x40;
+static const uint8_t MADCTL_BGR = 0x08;
+
+// Called at boot AND after every periodic re-init, so orientation/mirror always stays consistent.
+// (Mirror support by Vlad.)
 static void applyOrientation() {
-  tft.setRotation(DISP_ROTATION);   // also sets the panel offsets for init(W, H)
-  if (DISP_BGR) {
-    static const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
-    uint8_t m = madctl[DISP_ROTATION & 3] | 0x08;
-    tft.sendCommand(ST77XX_MADCTL, &m, 1);
-  }
+  tft.setRotation(DISP_ROTATION);   // sets width/height and panel offsets for init(W, H)
+
+  // Same base values Adafruit_ST7789::setRotation() uses for rotation 0..3
+  static const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
+  uint8_t r = DISP_ROTATION & 3;
+  uint8_t m = madctl[r];
+
+  // Horizontal mirror. In landscape (r = 1/3, MV set) the screen X axis is driven by MY,
+  // in portrait (r = 0/2) by MX.
+  if (DISP_MIRROR_X) m ^= (r & 1) ? MADCTL_MY : MADCTL_MX;
+
+  if (DISP_BGR) m |= MADCTL_BGR;
+  tft.sendCommand(ST77XX_MADCTL, &m, 1);
   tft.invertDisplay(DISP_INVERT);
 }
 
@@ -80,17 +95,21 @@ static void sendStep(uint8_t i) {
   else tft.sendCommand(initSeq[i].cmd);
 }
 
-// Random splash per boot. lastSplash survives warm resets (not power cycles), so a reset never
-// shows the same penguin twice in a row.
-static uint8_t lastSplash __attribute__((section(".noinit")));
+// Random splash per boot, never the same one twice in a row. Kept in EEPROM (the mode uses 0/1):
+// a boot counter that varies the seed (micros() and ADC noise are nearly identical every boot) and the
+// last penguin shown. One EEPROM write per boot is ~27 years of 10 boots/day.
+static const uint8_t EE_SPLASH_COUNT = 2, EE_SPLASH_LAST = 3;
 
 static uint8_t pickSplash() {
-  uint32_t seed = micros();
+  uint8_t boots = EEPROM.read(EE_SPLASH_COUNT) + 1;
+  EEPROM.update(EE_SPLASH_COUNT, boots);
+  uint32_t seed = micros() ^ ((uint32_t)boots * 2654435761UL);
   for (uint8_t i = 0; i < 16; i++) seed = (seed << 1) ^ (analogRead(PIN_T3 + (i % 3)) & 1);  // ADC LSB noise
   randomSeed(seed);
+  uint8_t last = EEPROM.read(EE_SPLASH_LAST);   // 0xFF on a blank EEPROM = none
   uint8_t n = random(SPLASH_COUNT);
-  if (lastSplash < SPLASH_COUNT && n == lastSplash) n = (n + 1 + random(SPLASH_COUNT - 1)) % SPLASH_COUNT;
-  lastSplash = n;
+  if (last < SPLASH_COUNT && n == last) n = (n + 1 + random(SPLASH_COUNT - 1)) % SPLASH_COUNT;
+  EEPROM.update(EE_SPLASH_LAST, n);
   return n;
 }
 

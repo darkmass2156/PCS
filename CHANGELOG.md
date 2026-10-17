@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.3.1 | 2 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.1` |
 | 2026-10-17 | 0.3.0 | 1 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.0` |
 | 2026-10-17 | 0.2.0 | — | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.2.0` |
 | 2026-10-17 | 0.1.0 | — | 1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
@@ -17,6 +18,23 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.3.1, DISP rev 2 — 2026-10-17
+Fixes from the first Wokwi run (ILI9341 part driven by the ST7789 code). Splash re-verified on a strict
+framebuffer model (every window filled exactly, nothing off screen); host syntax check for both targets.
+
+### Fixed
+- Hobo splash never appeared: the "last shown" index lived in `.noinit` RAM without a validity check, so a
+  cold start with RAM at 0 always excluded penguin 0. Now EEPROM addr 3, and the seed mixes an EEPROM boot
+  counter (addr 2) because micros()/ADC noise are almost the same every boot.
+- Streaks and mirrored fragments in the beak area: the patch was drawn as ~50 separate fillRects, each with
+  its own window commands; the corruption pattern (1-2 px streaks, patch pixels mirrored across the screen)
+  is window/orientation commands going wrong in transit. Sprites and patches now stream through one address
+  window per chunk (~13 windows per splash), opaque.
+
+### Changed
+- Vlad's MADCTL mirror support adopted, behind `DISP_TARGET_ILI9341_SIM` (1 = simulator: mirror, BGR, no
+  invert; 0 = real ST7789: no mirror, RGB, invert). Banner warns on a simulator build. `11_ui_dev` follows.
 
 ## FW 0.3.0, DISP rev 1 — 2026-10-17
 First display-software revision. Host syntax check of both variants; the splash was rendered on a simulated

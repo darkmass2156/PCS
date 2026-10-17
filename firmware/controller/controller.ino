@@ -29,6 +29,9 @@ static void printHeader() {
   Serial.print(DISPLAY_REV);
   Serial.print(F(" variant "));
   Serial.println(DISPLAY_VARIANT);
+#if DISP_TARGET_ILI9341_SIM
+  Serial.println(F("# DISPLAY TARGET: ILI9341 simulator (mirror, BGR, no invert) - not for the real ST7789"));
+#endif
 #if NTC_TRIMPOT_SIM
   Serial.print(F("# SIM BUILD: NTC inputs are trimpots"));
   if (SIM_FORCE_12V) Serial.print(F(", 12V forced present"));

@@ -31,11 +31,11 @@ class BootSplash {
       case BG:      // background in strips (a full fill is ~0.5 s at 2 MHz)
         if (fillStrip(sp->bg)) {
           step = SPRITE;
-          idx = rx = ry = 0;
+          idx = ry = 0;
         }
         break;
       case SPRITE:  // 6 sprite rows per call
-        if (drawRle(sp->base, sp->baseLen, sx, sy, sp->w, 6)) {
+        if (blit(sp->base, sx, sy, sp->w, sp->h, 6)) {
           step = ANIM;
           stage = 0;
           at = now;
@@ -62,7 +62,7 @@ class BootSplash {
   int16_t sx, sy;
   Step step = DONE;
   uint16_t idx;
-  uint8_t rx, ry, stage;
+  uint8_t ry, stage;
   uint32_t at;
 
   bool fillStrip(uint16_t c) {
@@ -73,28 +73,35 @@ class BootSplash {
     return true;
   }
 
-  // Draws up to `rows` sprite rows from where the last call stopped. True when the data is done.
-  // Index 0 is the background colour (palette entry 0).
-  bool drawRle(const uint8_t *data, uint16_t len, int16_t ox, int16_t oy, uint8_t w, uint8_t rows) {
-    uint8_t stop = ry + rows;
-    while (idx < len && ry < stop) {
-      uint8_t b = pgm_read_byte(data + idx++);
-      uint8_t c = b >> 4, n = (b & 0x0F) + 1;
-      if (c) tft->fillRect(ox + rx * S, oy + ry * S, n * S, S, pgm_read_word(sp->pal + c));
-      else if (step == ANIM) tft->fillRect(ox + rx * S, oy + ry * S, n * S, S, sp->bg);  // patches are opaque
-      rx += n;
-      if (rx >= w) {
-        rx = 0;
-        ry++;
+  uint16_t color(uint8_t c) const { return c ? pgm_read_word(sp->pal + c) : sp->bg; }
+
+  // Streams up to `rows` sprite rows (from where the last call stopped) through ONE address window:
+  // one CASET/RASET/RAMWR, then pixels. Each sprite row is replayed S times for the vertical scale.
+  // (Drawing every colour run as its own fillRect cost ~50 window commands per beak patch; a mangled
+  // command then shows up as thin streaks or mirrored fragments.) True when all h rows are done.
+  bool blit(const uint8_t *data, int16_t ox, int16_t oy, uint8_t w, uint8_t h, uint8_t rows) {
+    if (ry + rows > h) rows = h - ry;
+    tft->startWrite();
+    tft->setAddrWindow(ox, oy + ry * S, w * S, rows * S);
+    for (uint8_t r = 0; r < rows; r++, ry++) {
+      uint16_t rowStart = idx;
+      for (uint8_t k = 0; k < S; k++) {
+        idx = rowStart;
+        for (uint8_t x = 0; x < w;) {
+          uint8_t b = pgm_read_byte(data + idx++);
+          uint8_t n = (b & 0x0F) + 1;
+          tft->writeColor(color(b >> 4), (uint32_t)n * S);
+          x += n;
+        }
       }
     }
-    return idx >= len;
+    tft->endWrite();
+    return ry >= h;
   }
 
   void beak(bool noot) {
-    idx = rx = ry = 0;
-    drawRle(noot ? sp->noot : sp->beak, noot ? sp->nootLen : sp->beakLen,
-            sx + sp->px * S, sy + sp->py * S, sp->pw, 255);
+    idx = ry = 0;
+    blit(noot ? sp->noot : sp->beak, sx + sp->px * S, sy + sp->py * S, sp->pw, sp->ph, sp->ph);
   }
 
   // Timeline (ms after the sprite is up): noot 600, back 1000, noot 1250, back 1650, end 2600.

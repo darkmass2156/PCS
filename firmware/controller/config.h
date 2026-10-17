@@ -30,8 +30,19 @@
 // ---------------- Display ----------------
 #define DISPLAY_VARIANT 1          // 1 = MSP1691 240x280, 2 = MSP1901 170x320
 #define DISP_SPI_HZ     2000000UL
-#define DISP_INVERT     1          // flip if colours look negative
+// Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
+// MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
+// The banner prints which one a build is for. Set back to 0 before flashing the real controller.
+#define DISP_TARGET_ILI9341_SIM 1
+#if DISP_TARGET_ILI9341_SIM
+#define DISP_INVERT     0
+#define DISP_BGR        1
+#define DISP_MIRROR_X   1
+#else
+#define DISP_INVERT     1          // ST7789 IPS: flip if colours look negative
 #define DISP_BGR        0          // set if red and blue are swapped
+#define DISP_MIRROR_X   0          // set if text is mirrored
+#endif
 #define DISP_ROTATION   1          // landscape (layout.h W x H); 3 = landscape upside down
 #define BOOT_SPLASH     1          // penguin "noot noot" splash at boot (non-blocking, ~3 s)
 #define DISP_REINIT_MS  300000UL

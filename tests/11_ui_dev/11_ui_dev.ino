@@ -25,8 +25,16 @@
 
 #define DISPLAY_VARIANT 1   // 1 = MSP1691 280x240 landscape, 2 = MSP1901 320x170 landscape
 #define DISP_ROTATION 1     // 3 = landscape upside down
+#define DISP_TARGET_ILI9341_SIM 1   // same switch as config.h: 1 = Wokwi ILI9341, 0 = real ST7789
+#if DISP_TARGET_ILI9341_SIM
+#define DISP_INVERT 0
+#define DISP_BGR 1
+#define DISP_MIRROR_X 1
+#else
 #define DISP_INVERT 1
 #define DISP_BGR 0
+#define DISP_MIRROR_X 0
+#endif
 #include "layout.h"
 #include "splash.h"
 
@@ -164,13 +172,14 @@ void fullRedraw() {
 }
 
 // ---------------- init / re-init ----------------
-void applyOrientation() {
+void applyOrientation() {   // mirrors display.cpp
   tft.setRotation(DISP_ROTATION);
-  if (DISP_BGR) {
-    const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
-    uint8_t m = madctl[DISP_ROTATION & 3] | 0x08;
-    tft.sendCommand(ST77XX_MADCTL, &m, 1);
-  }
+  const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
+  uint8_t r = DISP_ROTATION & 3;
+  uint8_t m = madctl[r];
+  if (DISP_MIRROR_X) m ^= (r & 1) ? 0x80 : 0x40;   // MY in landscape, MX in portrait
+  if (DISP_BGR) m |= 0x08;
+  tft.sendCommand(ST77XX_MADCTL, &m, 1);
   tft.invertDisplay(DISP_INVERT);
 }
 
