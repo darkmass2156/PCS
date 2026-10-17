@@ -215,7 +215,7 @@ uint32_t Screens::slantBar(uint8_t slot, int16_t x, int16_t y, int16_t w, int16_
   return key(hn(lit, slot + 7));
 }
 
-// Mode 1 bottom strip: distance to dew with bar, or a banner.
+// Mode 1 bottom strip (y 178..239): distance to dew with bar, or a banner.
 uint32_t Screens::bottomStrip1(const UiData &d, bool draw) {
   char b[24], t[48];
   uint8_t kind = d.no12v ? 2 : d.faults ? 3 : 1;
@@ -226,28 +226,28 @@ uint32_t Screens::bottomStrip1(const UiData &d, bool draw) {
   uint32_t k = key(hs(kind == 3 ? f : b, hn(kind * 1000 + px + n * 7)));
   if (!draw) return k;
   if (kind != stripKind) {
-    gfx->fillRect(0, 189, W, 51, kind == 1 ? C_BLK : kind == 2 ? C_DG : C_RED);
+    gfx->fillRect(0, 178, W, 62, kind == 1 ? C_BLK : kind == 2 ? C_DG : C_RED);
     if (kind == 1) {
-      txt(4, 196, 1, C_LG, C_BLK, "DISTANCE TO DEW", 15);
-      gfx->drawRect(4, 212, 272, 11, C_DG);
-      txt(4, 228, 1, C_DG, C_BLK, "dew", 3);
-      txt(W - 4 - 18, 228, 1, C_DG, C_BLK, "+15", 3);
+      ftxt(F_LABEL, 4, 186, C_LG, C_BLK, "DISTANCE TO DEW", 0);
+      gfx->drawRect(4, 205, 272, 12, C_DG);
+      ftxt(F_LABEL, 4, 222, C_DG, C_BLK, "at dew", 0);
+      ftxt(F_LABEL, W - 4 - 60, 222, C_DG, C_BLK, "+15 \xF8" "C", 60, 'r');
     }
     stripKind = kind;
   }
   if (kind == 1) {
-    txt(W - 4 - 84, 192, 2, (!isnan(d.dew) && d.dew < 2) ? C_HOT : C_WHT, C_BLK, b, 7, 'r');
+    ftxt(F_VALUE, W - 4 - 96, 183, (!isnan(d.dew) && d.dew < 2) ? C_HOT : C_WHT, C_BLK, b, 96, 'r');
     int16_t red = px < 36 ? px : 36;
-    gfx->fillRect(5, 213, red, 9, C_RED);
-    gfx->fillRect(5 + red, 213, px - red, 9, C_LG);
-    gfx->fillRect(5 + px, 213, 270 - px, 9, C_BLK);
+    gfx->fillRect(5, 206, red, 10, C_RED);
+    gfx->fillRect(5 + red, 206, px - red, 10, C_LG);
+    gfx->fillRect(5 + px, 206, 270 - px, 10, C_BLK);
   } else if (kind == 2) {
-    txt(4, 207, 2, C_WHT, C_DG, "NO 12V - PC OFF", 22, 'c');
+    ftxt(F_VALUE, 4, 201, C_WHT, C_DG, "NO 12V  -  PC OFF", 272, 'c');
   } else {
     snprintf(t, sizeof(t), "FAULT: %s", f);
-    txt(4, 198, 2, C_WHT, C_RED, t, 22, 'c');
-    snprintf(t, sizeof(t), "%u active - press a button", n);
-    txt(4, 222, 1, C_WHT, C_RED, n > 1 ? t : "press a button to reset", 45, 'c');
+    ftxt(F_VALUE, 4, 191, C_WHT, C_RED, t, 272, 'c');
+    snprintf(t, sizeof(t), "%u active  -  press a button to reset", n);
+    ftxt(F_LABEL, 4, 215, C_WHT, C_RED, n > 1 ? t : "press a button to reset", 272, 'c');
   }
   return k;
 }
@@ -286,34 +286,33 @@ bool Screens::staticStep(uint16_t i) {
     static const char *const LAB[3] = {"OUTSIDE RAD", "LOOP 1 RETURN", "MIXING VALVE"};
     switch (i) {
       case 0:
-        txt(4, 4, 1, C_LG, C_BLK, "STANDARD", 8);
+        ftxt(F_LABEL, 4, 3, C_LG, C_BLK, "STANDARD", 0);
         gfx->drawFastHLine(0, 15, W, C_DG);
         return true;
       case 1:
         for (uint8_t c = 0; c < 3; c++) {
           int16_t x0 = c * 93;
-          txt(x0 + 1, 20, 1, C_LG, C_BLK, LAB[c], 15, 'c');
-          txt(x0 + 80, 34, 1, C_LG, C_BLK, "\xF8" "C", 2);
-          if (c) gfx->drawFastVLine(x0, 20, 50, C_DG);
+          ftxt(F_LABEL, x0 + 1, 20, C_LG, C_BLK, LAB[c], 91, 'c');
+          if (c) gfx->drawFastVLine(x0, 20, 40, C_DG);
         }
         return true;
       case 2:
       case 3: {
         int16_t x0 = i == 2 ? 4 : 142;
-        gfx->drawRect(x0, 78, 134, 64, C_DG);
-        gfx->fillRect(x0, 78, 134, 12, C_DG);
-        txt(x0 + 4, 80, 1, C_WHT, C_DG, i == 2 ? "CASE" : "ROOM", 4);
-        txt(x0 + 5, 97, 1, C_LG, C_BLK, "Temp", 4);
-        txt(x0 + 5, 113, 1, C_LG, C_BLK, "Humidity", 8);
-        txt(x0 + 5, 129, 1, C_LG, C_BLK, "Dew pt", 6);
+        gfx->drawRect(x0, 64, 134, 65, C_DG);
+        gfx->fillRect(x0, 64, 134, 13, C_DG);
+        ftxt(F_LABEL, x0 + 5, 66, C_WHT, C_DG, i == 2 ? "CASE" : "ROOM", 0);
+        ftxt(F_LABEL, x0 + 6, 83, C_LG, C_BLK, "Temp", 0);
+        ftxt(F_LABEL, x0 + 6, 99, C_LG, C_BLK, "Humidity", 0);
+        ftxt(F_LABEL, x0 + 6, 115, C_LG, C_BLK, "Dew point", 0);
         return true;
       }
       case 4: {
         static const char *const T[4] = {"COOLING", "EXT LOOP", "VALVE", "FAN"};
         for (uint8_t k = 0; k < 4; k++) {
-          int16_t x0 = k % 2 ? 142 : 4, y0 = k < 2 ? 146 : 167;
+          int16_t x0 = k % 2 ? 142 : 4, y0 = k < 2 ? 134 : 155;
           gfx->drawRect(x0, y0, 134, 20, C_DG);
-          txt(x0 + 5, y0 + 6, 1, C_LG, C_BLK, T[k], 8);
+          ftxt(F_LABEL, x0 + 6, y0 + 5, C_LG, C_BLK, T[k], 0);
         }
         return true;
       }
@@ -416,12 +415,12 @@ bool Screens::staticStep(uint16_t i) {
 uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
   char b[48], t[24];
   if (mode == 1) {
-    static const SegStyle SEG1 = {14, 30, 3, 3, 0};
-    if (i == 0) return heartbeat(272, 6, C_WHT, C_DG, draw);
-    if (i <= 3) {
+    if (i == 0) return heartbeat(272, 7, C_WHT, C_DG, draw);
+    if (i <= 3) {   // big temperatures, "12.3°"
       float v = i == 1 ? d.rad : i == 2 ? d.loop : d.valve;
-      seg5(b, v);
-      if (draw) segText((i - 1) * 93 + 7, 34, SEG1, b, segPrev[i - 1], C_WHT, C_BLK);
+      fmt1(b, v, !isnan(v));
+      if (!isnan(v)) strcat(b, "\xF8");
+      if (draw) ftxt(F_BIG, (i - 1) * 93 + 2, 34, C_WHT, C_BLK, b, 89, 'c');
       return key(hs(b, i));
     }
     if (i <= 9) {
@@ -429,19 +428,22 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
       bool room = k >= 3;
       float v = row == 0 ? (room ? d.roomT : d.caseT) : row == 1 ? (room ? d.roomRH : d.caseRH) : (room ? d.roomDP : d.caseDP);
       if (row == 1) pct(b, v); else degC(b, v);
-      if (draw) txt((room ? 142 : 4) + 129 - 72, 93 + row * 16, 2, C_WHT, C_BLK, b, 6, 'r');
+      if (draw) ftxt(F_VALUE, (room ? 142 : 4) + 58, 80 + row * 16, C_WHT, C_BLK, b, 71, 'r');
       return key(hs(b, i));
     }
     if (i <= 13) {
       uint8_t k = i - 10;
       const char *v = k == 0 ? potText(t, d) : k == 1 ? (d.extOpen ? "OPEN" : "CLOSED") : k == 2 ? valveText(d) : fanText(t, d);
-      uint8_t w = k == 3 ? 7 : 6;
-      if (draw) txt((k % 2 ? 142 : 4) + 131 - w * 12, (k < 2 ? 146 : 167) + 3, 2, C_WHT, C_BLK, v, w, 'r');
+      static const char *const T[4] = {"COOLING", "EXT LOOP", "VALVE", "FAN"};   // same as the static labels
+      if (draw) {
+        int16_t x0 = k % 2 ? 142 : 4, vx = x0 + 6 + ftWidth(F_LABEL, T[k]) + 4;   // value box right of its label
+        ftxt(F_VALUE, vx, (k < 2 ? 134 : 155) + 2, C_WHT, C_BLK, v, x0 + 130 - vx, 'r');
+      }
       return key(hs(v, i));
     }
     if (i == 14) return bottomStrip1(d, draw);
     snprintf(b, sizeof(b), "%s%s", d.state, d.sim ? " SIM" : "");   // 15: state next to the title
-    if (draw) txt(64, 4, 1, C_DG, C_BLK, b, 12);
+    if (draw) ftxt(F_LABEL, 66, 3, C_DG, C_BLK, b, 90);
     return key(hs(b, i));
   }
 

@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-17 | 0.4.1 | 4 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.1` |
 | 2026-10-17 | 0.4.0 | 3 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.0` |
 | 2026-10-17 | 0.3.1 | 2 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.1` |
 | 2026-10-17 | 0.3.0 | 1 | 1.1 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.3.0` |
@@ -19,6 +20,26 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.1, DISP rev 4 — 2026-10-17
+Host-rendered with `tools/ui_preview` (Mode 1 all states, boot frames of all three penguins); host syntax check.
+Not yet compiled for AVR.
+
+### Changed
+- Mode 1 uses anti-aliased proportional fonts instead of the scaled 5x7 font and segment digits: FreeSans Bold
+  33 px for the three big temperatures ("12.3°"), DejaVu Sans Bold 15 px for values, DejaVu Sans 10 px for
+  labels. Layout re-fitted; tile values sit right of their measured label.
+- Boot: the penguin glitching out and the ROG logo glitching in now overlap. Torn logo bands cut in while the
+  penguin still tears, take over with shrinking displacement, then the logo resolves clean in white and a red
+  scan crosses it (replaces "black, then grey logo, then white wipe").
+
+### Added
+- `fonts.h` + `ftxt()` in `scr_gfx`: 2-bit AA bitmap fonts streamed through one window per field.
+  Generator `tools/fonts/make_fonts.py` (DejaVu Sans, GNU FreeSans).
+
+### Fixed
+- Red scan: the final white-restore slice could request columns past the logo edge (short address window).
+  `rog()` now clamps to the logo width and clips shifted bands to the screen.
 
 ## FW 0.4.0, DISP rev 3, BENCH 1.2 — 2026-10-17
 New dashboard: one screen per mode, ROG palette, plus the Pingu → glitch → ROG boot sequence. Rendered on the

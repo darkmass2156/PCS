@@ -14,7 +14,7 @@ def sheet(names, path, cols=3):
         out.paste(im.resize((280 * S, 240 * S), Image.NEAREST), (x, y + 28))
     out.save(os.path.join(dst, path))
     print('wrote', path)
-sheet(['boot0_noot', 'boot0_glitch1', 'boot0_glitch2', 'boot0_glitch3', 'boot0_rog_sweep', 'boot0_rog',
-       'boot1_glitch2', 'boot2_glitch1', 'boot2_glitch3'], 'preview_boot.png')
+sheet(['boot0_noot', 'boot0_glitch_a', 'boot0_glitch_b', 'boot0_glitch_c', 'boot0_glitch_d', 'boot0_rog_scan',
+       'boot1_glitch_b', 'boot2_glitch_c', 'boot0_rog'], 'preview_boot.png')
 sheet(['mode1', 'mode2', 'mode3', 'mode1_changed', 'mode2_changed', 'mode3_changed',
        'mode1_fault', 'mode2_fault', 'mode3_fault', 'mode1_no12v', 'mode2_no12v', 'mode3_no12v'], 'preview_modes.png')

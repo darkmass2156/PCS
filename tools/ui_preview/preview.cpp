@@ -36,12 +36,14 @@ int main(int argc, char **argv) {
     BootSplash sp;
     tft.fillScreen(0);
     sp.begin(&tft, 280, 240, k, "0.4.0", false, 0);
-    struct { uint32_t t; const char *name; } shots[] = {{1150, "noot"}, {2400, "glitch1"}, {2560, "glitch2"},
-                                                         {2800, "glitch3"}, {3800, "rog_sweep"}, {4600, "rog"}};
+    struct { uint32_t t; const char *name; } shots[] = {{1150, "noot"}, {2650, "glitch_a"}, {2870, "glitch_b"},
+                                                         {3060, "glitch_c"}, {3230, "glitch_d"}, {3700, "rog_scan"},
+                                                         {4400, "rog"}};
+    const int NSHOT = 7;
     int si = 0;
     for (uint32_t now = 0; now < 9000; now += 10) {
       sp.update(now);
-      if (si < 6 && now >= shots[si].t) {
+      if (si < NSHOT && now >= shots[si].t) {
         tft.savePPM((OUT + "/boot" + std::to_string(k) + "_" + shots[si].name + ".ppm").c_str());
         si++;
       }
