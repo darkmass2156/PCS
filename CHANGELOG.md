@@ -8,10 +8,34 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|
+| 2026-10-17 | 0.1.0 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.1.0` |
 | 2026-10-17 | — | 2 | 4b + CS mod + SHT30 | rev11 | `logic-r2` |
 | 2026-10-17 | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.1.0 — 2026-10-17 (logic rev 2, HW 4b + CS + SHT30)
+First firmware. **Not yet compiled for AVR** (no toolchain in the build session) — first IDE compile may
+surface small errors. Host-side syntax check and a control-logic simulation passed.
+
+### Added
+- `firmware/controller/`: safe boot (outputs LOW first), Timer3 25 kHz PWM (0 % = pin held LOW),
+  tach via INT2/INT3/PCINT6, fuse sense with hysteresis + debounce, 12V presence.
+- NTC T1/T2/T3 (Beta + offset, EMA filter, 2 s out-of-range debounce).
+- SHT31 A/B on hardware I2C (50 kHz, Wire timeout) + SHT30 on in-tree soft I2C, CRC, 3-fail/3-good validity.
+- Logic rev 2 state machine: NO12V → HOME → IDLE ⇄ START → RUN → STOP, SAFE on latched faults.
+- V2 driver: single interlocked VO/VC writer, reversal dead time, θ model with open/close times and
+  backlash, every move to bypass = full park with overdrive and re-zero.
+- Fan staging after V2, start rate limit, T_out estimate, feasibility guard, sleep/wake.
+- Buttons (BTN1 = Mode 1, BTN2 short/long = Mode 2/3, any press acks cleared faults), EEPROM mode.
+- Status LED scheme (PROPOSAL, provisional).
+- ST7789 display: both variants, 2 MHz re-sent init, one field per loop pass, 5-min non-blocking re-init,
+  rotating fault/alarm line.
+- CSV log at 1 Hz, `?` status dump, watchdog 2 s, reset-cause capture.
+- `tests/00…09` bench sketches; `02` includes the SHT30, `01` can measure Beta with a second point.
+
+### Not implemented
+- Freeze guard (PROPOSAL, awaiting decision).
 
 ## 2026-10-17 — LOGIC rev 2, SCH rev11, HW SHT30 add-on
 Change note: [`docs/changes/logic_rev2.md`](docs/changes/logic_rev2.md)
