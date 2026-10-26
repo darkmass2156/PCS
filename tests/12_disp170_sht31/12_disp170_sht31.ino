@@ -3,8 +3,10 @@
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
 //
 // Wiring (same pins as the controller, so it also runs on the finished box with the 1.9" on C4):
-//   display  CS D49, DC D53, MOSI D51, SCK D52 through 1k/2k dividers (3.3 V logic), VCC 3V3, GND.
-//            RES: TFT_RST below, or -1 if the module's RES has its own pull-up / RC. BLK open or 3V3.
+//   display  module SDA -> D51 (MOSI), SCL -> D52 (SCK)  (SPI, NOT the I2C pins D20/D21 despite the labels)
+//            CS -> D49, DC -> D53, RES -> D48, all five through 1k/2k dividers (3.3 V logic).
+//            VCC 3V3, GND, BLK open or 3V3. A floating RES keeps the panel in reset: black with backlight on.
+//            Set TFT_RST -1 only if RES has its own pull-up / RC (as on the controller's C4 cable).
 //   SHT31    SDA D20, SCL D21 (4.7k-10k pull-ups to 5V; most breakouts have them), VIN 5V, GND.
 //            A: ADDR to GND = 0x44, B: ADDR to VIN = 0x45.
 //
@@ -13,7 +15,7 @@
 //   BTN2 short  invert on/off (colours negative -> toggle)
 //   BTN1 long   BGR on/off (red and blue swapped -> toggle)
 //   BTN2 long   reset the error counters
-// Serial: p page, i invert, b BGR, r reset counters, ? help. One line per read (2 s):
+// Serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3 + re-init, c colour flash, ? help. One line per read (2 s):
 //   A t rh dp [ok/nack/crc] | B ... | dDP spread
 // LED: green flash per read with both valid, yellow if one missing, red if none.
 // Pass: both read every 2 s with no NACK/CRC for 10+ min, same air -> T within ~0.3 °C, DP within ~1 °C,
@@ -26,13 +28,14 @@
 #include "bench.h"
 #include "scr_gfx.h"
 
-#define TFT_RST -1          // pin wired to the module's RES, or -1
+#define TFT_RST 48          // pin wired to the module's RES (via divider), or -1
 #define ROTATION 1          // 3 = landscape upside down
 const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);
 bool inv = true, bgr = false;   // real ST7789 defaults (config.h: DISP_INVERT 1, DISP_BGR 0)
 uint8_t page = 0;               // 0 live, 1 panel check
+uint8_t spiMode = SPI_MODE0;    // modules without a CS pin need SPI_MODE3
 
 struct Sht {
   const char *name;
@@ -115,7 +118,7 @@ void applyOrientation() {   // as display.cpp: rotation, then MADCTL with BGR, t
 
 void initPanel() {
   uint8_t colmod = 0x55;
-  tft.init(170, 320);           // native portrait size; the library sets the 35-column offset
+  tft.init(170, 320, spiMode);  // native portrait size; the library sets the 35-column offset (and pulses RES)
   tft.setSPISpeed(2000000);     // long cable: redo the init sequence at 2 MHz
   tft.sendCommand(ST77XX_SWRESET); delay(150);
   tft.sendCommand(ST77XX_SLPOUT);  delay(120);
@@ -210,7 +213,18 @@ void redraw() {
 
 void help() {
   Serial.println(F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
-  Serial.println(F("serial: p page, i invert, b BGR, r reset counters, ? help"));
+  Serial.println(F("serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3, c colour flash, ? help"));
+  Serial.print(F("pins: CS 49, DC 53, MOSI 51, SCK 52, RES ")); Serial.print(TFT_RST);
+  Serial.print(F(" | SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
+}
+
+// Full-screen colours one after another, ~0.4 s each: if this stays black, the panel isn't receiving at all.
+void colourFlash() {
+  const uint16_t c[4] = {ST77XX_RED, ST77XX_GREEN, ST77XX_BLUE, ST77XX_WHITE};
+  for (uint8_t i = 0; i < 4; i++) {
+    tft.fillScreen(c[i]);
+    delay(400);   // test only, outside the read cycle
+  }
 }
 
 void setup() {
@@ -225,6 +239,7 @@ void setup() {
   gfx = &tft;
   uint32_t t0 = millis();
   initPanel();
+  colourFlash();   // first sign of life: R, G, B, white
   redraw();
   Serial.print(F("panel init + first draw ms ")); Serial.println(millis() - t0);
 }
@@ -246,6 +261,17 @@ void loop() {
     Serial.println(F("--- counters reset ---"));
   }
   if (c == '?') help();
+  if (c == 'm') {
+    spiMode = spiMode == SPI_MODE0 ? SPI_MODE3 : SPI_MODE0;
+    Serial.print(F("SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
+    initPanel();
+    colourFlash();
+    redraw();
+  }
+  if (c == 'c') {
+    colourFlash();
+    redraw();
+  }
   if (c == 'i' || c == 'b') { Serial.print(F("invert ")); Serial.print(inv); Serial.print(F(" BGR ")); Serial.println(bgr); }
   if (c == 'p' || c == 'i' || c == 'b') redraw();
 

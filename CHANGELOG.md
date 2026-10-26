@@ -25,6 +25,13 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 ---
 
+## BENCH 1.3 fix — 2026-10-26
+### Fixed
+- `12_disp170_sht31` black screen with backlight on: `TFT_RST` defaulted to -1, and on a breadboard the module's
+  RES floats (no pull-up on most 1.9" modules), so the panel never leaves reset. Default RES pin is now D48
+  (via divider). Added a colour flash at boot (R, G, B, white), serial `m` (SPI mode 0/3 + re-init, for
+  modules without CS) and `c` (colour flash). Header warns that the module's SDA/SCL are SPI (D51/D52).
+
 ## BENCH 1.3 — 2026-10-26
 Host syntax check and a host render (`docs/display/preview_disp170_sht31.png`). Not yet compiled for AVR.
 
