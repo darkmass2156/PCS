@@ -36,7 +36,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
   the button map is in the sketch header and printed at boot. Serial commands stay as a backup.
 - Shared bench code is `tests/common/bench.h` (canonical, `BENCH_VERSION`); each test folder holds an
   identical copy. Same for `softi2c.*` and the display files `fonts.h`, `scr_gfx.*`, `scr_data.h`, `screens.*`, `splash.h`,
-  `boot_sprite.h`, `rog_logo.h` (canonical in `firmware/controller/`, copied into `tests/11_ui_dev`).
+  `boot_sprite.h`, `rog_logo.h` (canonical in `firmware/controller/`, copied into `tests/11_ui_dev`;
+  `fonts.h` and `scr_gfx.*` also into `tests/12_disp170_sht31`).
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
   Everything else (SHT3x, soft I2C) is in-tree.
@@ -345,6 +346,8 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 11. `10_v2_calibration` — t_open/t_close (button-marked), backlash, indicator linearity, and on the filled
     loop the flow characteristic f(θ) = (T1 − T2)/(T1 − T3). Output → V2 tunables and the θ equation.
 12. `11_ui_dev` — the real dashboard screens and boot sequence with fake data (mode/scenario on the buttons).
+13. `12_disp170_sht31` — the 1.9" 170x320 panel (landscape 320x170) and both SHT31s together: live T/RH/DP of
+    A and B, NACK/CRC counters, DP spread on screen and Serial; panel check page (frame, RGB, invert/BGR toggles).
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the

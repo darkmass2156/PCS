@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-26 | — | — | 1.3 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-17 | 0.4.4 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.4` |
 | 2026-10-17 | 0.4.3 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.3` |
 | 2026-10-17 | 0.4.2 | 5 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.2` |
@@ -23,6 +24,16 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## BENCH 1.3 — 2026-10-26
+Host syntax check and a host render (`docs/display/preview_disp170_sht31.png`). Not yet compiled for AVR.
+
+### Added
+- `tests/12_disp170_sht31`: the 1.9" ST7789 (`init(170, 320)`, landscape 320x170, 2 MHz) and SHT31 A/B on
+  hardware I2C (50 kHz, wire timeout). Live T / RH / DP per sensor with ok/NACK/CRC counters, DP spread and
+  T A−B, flagged red over 2 °C; non-blocking 2 s read cycle; one Serial line per read. Panel check page
+  (frame on all edges, RGB bars). Buttons: BTN1 page, BTN2 invert, BTN1 long BGR, BTN2 long reset counters.
+  Same pins as the controller; `TFT_RST` for modules with a RES pin. Uses the dashboard AA fonts.
 
 ## FW 0.4.4 — 2026-10-17
 Host syntax check of firmware and `11_ui_dev`. Not yet compiled for AVR. Animation unchanged.

@@ -1,0 +1,280 @@
+// 12_disp170_sht31 — the 1.9" ST7789 (170x320, used landscape 320x170) and the two in-case SHT31s together.
+// Live T / RH / dew point of A (0x44) and B (0x45) on the screen and on Serial, plus a panel check page.
+// Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
+//
+// Wiring (same pins as the controller, so it also runs on the finished box with the 1.9" on C4):
+//   display  CS D49, DC D53, MOSI D51, SCK D52 through 1k/2k dividers (3.3 V logic), VCC 3V3, GND.
+//            RES: TFT_RST below, or -1 if the module's RES has its own pull-up / RC. BLK open or 3V3.
+//   SHT31    SDA D20, SCL D21 (4.7k-10k pull-ups to 5V; most breakouts have them), VIN 5V, GND.
+//            A: ADDR to GND = 0x44, B: ADDR to VIN = 0x45.
+//
+// Buttons:
+//   BTN1 short  page: live readings <-> panel check (frame, RGB bars)
+//   BTN2 short  invert on/off (colours negative -> toggle)
+//   BTN1 long   BGR on/off (red and blue swapped -> toggle)
+//   BTN2 long   reset the error counters
+// Serial: p page, i invert, b BGR, r reset counters, ? help. One line per read (2 s):
+//   A t rh dp [ok/nack/crc] | B ... | dDP spread
+// LED: green flash per read with both valid, yellow if one missing, red if none.
+// Pass: both read every 2 s with no NACK/CRC for 10+ min, same air -> T within ~0.3 °C, DP within ~1 °C,
+// breathing on one sensor moves only that column.
+
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7789.h>
+#include "bench.h"
+#include "scr_gfx.h"
+
+#define TFT_RST -1          // pin wired to the module's RES, or -1
+#define ROTATION 1          // 3 = landscape upside down
+const uint16_t W = 320, H = 170;
+
+Adafruit_ST7789 tft(49, 53, TFT_RST);
+bool inv = true, bgr = false;   // real ST7789 defaults (config.h: DISP_INVERT 1, DISP_BGR 0)
+uint8_t page = 0;               // 0 live, 1 panel check
+
+struct Sht {
+  const char *name;
+  uint8_t addr;
+  bool trig, ok;
+  uint16_t good, nack, crc;
+  float t, rh, dp;
+};
+Sht sht[2] = {{"A  0x44", 0x44}, {"B  0x45", 0x45}};
+
+// ---------------- SHT31 ----------------
+uint8_t crc8(const uint8_t *d, uint8_t n) {
+  uint8_t crc = 0xFF;
+  for (uint8_t i = 0; i < n; i++) {
+    crc ^= d[i];
+    for (uint8_t b = 0; b < 8; b++) crc = (crc & 0x80) ? (crc << 1) ^ 0x31 : (crc << 1);
+  }
+  return crc;
+}
+
+float dewPoint(float t, float rh) {
+  const float a = 17.62f, b = 243.12f;
+  float g = log(rh / 100.0f) + a * t / (b + t);
+  return b * g / (a - g);
+}
+
+void trigger(Sht &s) {   // single shot, high repeatability, no clock stretching
+  Wire.beginTransmission(s.addr);
+  Wire.write((uint8_t)0x24);
+  Wire.write((uint8_t)0x00);
+  s.trig = Wire.endTransmission() == 0;
+}
+
+void fetch(Sht &s) {
+  uint8_t b[6];
+  s.ok = false;
+  if (!s.trig || Wire.requestFrom(s.addr, (uint8_t)6) != 6) {
+    s.nack++;
+    return;
+  }
+  for (uint8_t i = 0; i < 6; i++) b[i] = Wire.read();
+  if (crc8(b, 2) != b[2] || crc8(b + 3, 2) != b[5]) {
+    s.crc++;
+    return;
+  }
+  s.t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
+  s.rh = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
+  s.dp = dewPoint(s.t, s.rh);
+  s.ok = true;
+  s.good++;
+}
+
+void printRead() {
+  for (Sht &s : sht) {
+    Serial.print(s.name[0]); Serial.print(' ');
+    if (s.ok) {
+      Serial.print(s.t, 2); Serial.print(F(" C ")); Serial.print(s.rh, 1); Serial.print(F(" % DP ")); Serial.print(s.dp, 2);
+    } else Serial.print(s.trig ? F("CRC/READ FAIL") : F("NACK"));
+    Serial.print(F(" [")); Serial.print(s.good); Serial.print('/'); Serial.print(s.nack); Serial.print('/');
+    Serial.print(s.crc); Serial.print(F("] | "));
+  }
+  if (sht[0].ok && sht[1].ok) {
+    Serial.print(F("dT ")); Serial.print(sht[0].t - sht[1].t, 2);
+    Serial.print(F(" dDP ")); Serial.print(fabs(sht[0].dp - sht[1].dp), 2);
+    if (fabs(sht[0].dp - sht[1].dp) > 2.0f) Serial.print(F(" > 2 C ALARM"));
+  }
+  Serial.println();
+  uint8_t n = sht[0].ok + sht[1].ok;
+  if (n == 2) benchLed(0, 60, 0); else if (n) benchLed(120, 70, 0); else benchLed(150, 0, 0);
+}
+
+// ---------------- display ----------------
+void applyOrientation() {   // as display.cpp: rotation, then MADCTL with BGR, then invert
+  tft.setRotation(ROTATION);
+  const uint8_t madctl[4] = {0xC0, 0xA0, 0x00, 0x60};
+  uint8_t m = madctl[ROTATION & 3] | (bgr ? 0x08 : 0);
+  tft.sendCommand(ST77XX_MADCTL, &m, 1);
+  tft.invertDisplay(inv);
+}
+
+void initPanel() {
+  uint8_t colmod = 0x55;
+  tft.init(170, 320);           // native portrait size; the library sets the 35-column offset
+  tft.setSPISpeed(2000000);     // long cable: redo the init sequence at 2 MHz
+  tft.sendCommand(ST77XX_SWRESET); delay(150);
+  tft.sendCommand(ST77XX_SLPOUT);  delay(120);
+  tft.sendCommand(ST77XX_COLMOD, &colmod, 1); delay(10);
+  tft.sendCommand(ST77XX_NORON);   delay(10);
+  tft.sendCommand(ST77XX_DISPON);  delay(10);
+  applyOrientation();
+  tft.cp437(true);
+}
+
+uint32_t cache[16];   // per field: hash of what is on screen (0 = not drawn)
+
+uint32_t hs(const char *s, uint32_t h) {
+  while (*s) {
+    h ^= (uint8_t)*s++;
+    h *= 16777619UL;
+  }
+  return h | 1;
+}
+
+// Draws a text field only if its content or colour changed (background filled, so no flicker).
+void field(uint8_t id, const Font &f, int16_t x, int16_t y, uint16_t fg, const char *s, int16_t w, char align = 'l') {
+  uint32_t k = hs(s, 2166136261UL ^ fg);
+  if (cache[id] == k) return;
+  cache[id] = k;
+  ftxt(f, x, y, fg, C_BLK, s, w, align);
+}
+
+char *num(char *out, float v, bool ok, uint8_t dec, const char *unit) {
+  if (!ok) strcpy(out, dec == 2 ? "--.--" : "--.-");
+  else dtostrf(v, 0, dec, out);
+  strcat(out, unit);
+  return out;
+}
+
+void drawLiveStatic() {
+  tft.fillScreen(C_BLK);
+  memset(cache, 0, sizeof(cache));
+  ftxt(F_LABEL, 4, 3, C_LG, C_BLK, "SHT31 A / B   -   1.9\"  320 x 170", 0);
+  tft.drawFastHLine(0, 16, W, C_DG);
+  tft.drawFastVLine(160, 20, 106, C_DG);
+  tft.drawFastHLine(0, 129, W, C_DG);
+  for (uint8_t i = 0; i < 2; i++) {
+    int16_t x0 = i * 160;
+    ftxt(F_VALUE, x0 + 8, 21, C_WHT, C_BLK, sht[i].name, 0);
+    ftxt(F_LABEL, x0 + 8, 74, C_LG, C_BLK, "RH", 0);
+    ftxt(F_LABEL, x0 + 8, 92, C_LG, C_BLK, "Dew point", 0);
+  }
+  ftxt(F_LABEL, 8, 136, C_LG, C_BLK, "DP spread", 0);
+  ftxt(F_LABEL, 168, 136, C_LG, C_BLK, "T  A - B", 0);
+}
+
+void drawLive() {
+  char b[40], u[12];
+  for (uint8_t i = 0; i < 2; i++) {
+    Sht &s = sht[i];
+    int16_t x0 = i * 160;
+    field(i * 5 + 0, F_BIG, x0 + 8, 44, s.ok ? C_WHT : C_DG, num(b, s.t, s.ok, 2, "\xF8"), 144);
+    field(i * 5 + 1, F_VALUE, x0 + 70, 71, C_WHT, num(b, s.rh, s.ok, 1, " %"), 82, 'r');
+    field(i * 5 + 2, F_VALUE, x0 + 70, 89, C_WHT, num(b, s.dp, s.ok, 2, "\xF8" "C"), 82, 'r');
+    snprintf(b, sizeof(b), "ok %u  nack %u  crc %u", s.good, s.nack, s.crc);
+    field(i * 5 + 3, F_LABEL, x0 + 8, 111, (s.nack || s.crc) ? C_HOT : C_LG, b, 146);
+    field(i * 5 + 4, F_LABEL, x0 + 98, 24, s.ok ? C_LG : C_HOT, s.ok ? "OK" : s.trig ? "CRC FAIL" : "NO ACK", 54, 'r');
+  }
+  bool both = sht[0].ok && sht[1].ok;
+  float spread = fabs(sht[0].dp - sht[1].dp);
+  field(10, F_VALUE, 70, 133, both && spread > 2.0f ? C_HOT : C_WHT, num(b, spread, both, 2, "\xF8" "C"), 82, 'r');
+  field(11, F_VALUE, 230, 133, C_WHT, num(u, sht[0].t - sht[1].t, both, 2, "\xF8" "C"), 82, 'r');
+  field(12, F_LABEL, 8, 155, both && spread > 2.0f ? C_HOT : C_DG,
+        both ? (spread > 2.0f ? "spread > 2 \xF8" "C: firmware alarm" : "spread within 2 \xF8" "C") : "need both sensors", 200);
+}
+
+void drawCheck() {
+  tft.fillScreen(C_BLK);
+  memset(cache, 0, sizeof(cache));
+  tft.drawRect(0, 0, W, H, ST77XX_WHITE);   // must touch all four edges (offset check)
+  const uint16_t c[3] = {ST77XX_RED, ST77XX_GREEN, ST77XX_BLUE};
+  for (uint8_t i = 0; i < 3; i++) tft.fillRect(10, 28 + i * 30, W - 20, 24, c[i]);
+  ftxt(F_VALUE, 10, 6, C_WHT, C_BLK, "320 x 170   bars: RED GREEN BLUE", 0);
+  char b[40];
+  snprintf(b, sizeof(b), "invert %u   BGR %u   (BTN2 / BTN1 long)", inv, bgr);
+  ftxt(F_LABEL, 10, 124, C_LG, C_BLK, b, 0);
+  ftxt(F_LABEL, 10, 142, C_LG, C_BLK, "background black, frame on all 4 edges", 0);
+}
+
+void redraw() {
+  if (page == 0) {
+    drawLiveStatic();
+    drawLive();
+  } else drawCheck();
+}
+
+void help() {
+  Serial.println(F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
+  Serial.println(F("serial: p page, i invert, b BGR, r reset counters, ? help"));
+}
+
+void setup() {
+  benchOutputsLow();
+  Serial.begin(115200);
+  benchBanner(F("12_disp170_sht31"));
+  help();
+  benchButtonsBegin();
+  Wire.begin();
+  Wire.setClock(50000);
+  Wire.setWireTimeout(5000, true);
+  gfx = &tft;
+  uint32_t t0 = millis();
+  initPanel();
+  redraw();
+  Serial.print(F("panel init + first draw ms ")); Serial.println(millis() - t0);
+}
+
+void loop() {
+  uint32_t now = millis();
+  benchButtonsUpdate();
+  char c = 0;
+  if (btn1.shortPress) c = 'p';
+  if (btn2.shortPress) c = 'i';
+  if (btn1.longPress) c = 'b';
+  if (btn2.longPress) c = 'r';
+  if (!c && Serial.available()) c = Serial.read();
+  if (c == 'p') page ^= 1;
+  if (c == 'i') { inv = !inv; tft.invertDisplay(inv); }
+  if (c == 'b') { bgr = !bgr; applyOrientation(); }
+  if (c == 'r') {
+    for (Sht &s : sht) s.good = s.nack = s.crc = 0;
+    Serial.println(F("--- counters reset ---"));
+  }
+  if (c == '?') help();
+  if (c == 'i' || c == 'b') { Serial.print(F("invert ")); Serial.print(inv); Serial.print(F(" BGR ")); Serial.println(bgr); }
+  if (c == 'p' || c == 'i' || c == 'b') redraw();
+
+  // read cycle without delay(): trigger both, fetch 20 ms later, every 2 s
+  static uint32_t trigAt, ledAt;
+  static bool waiting;
+  if (!waiting && now - trigAt >= 2000) {
+    for (Sht &s : sht) trigger(s);
+    trigAt = now;
+    waiting = true;
+  }
+  if (waiting && now - trigAt >= 20) {
+    for (Sht &s : sht) fetch(s);
+    waiting = false;
+    printRead();
+    ledAt = now;
+  }
+  if (ledAt && now - ledAt >= 40) {
+    benchLed(0, 0, 0);
+    ledAt = 0;
+  }
+
+  if (page == 0) {
+    drawLive();   // only changed fields are sent
+    bool lit = (now / 1000) & 1;   // 1 Hz dot: the screen is alive
+    static int8_t dot = -1;
+    if (dot != lit) {
+      dot = lit;
+      tft.fillCircle(312, 8, 2, lit ? C_WHT : C_DG);
+    }
+  }
+}
