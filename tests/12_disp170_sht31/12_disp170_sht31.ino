@@ -15,8 +15,11 @@
 //   BTN2 short  invert on/off (colours negative -> toggle)
 //   BTN1 long   BGR on/off (red and blue swapped -> toggle)
 //   BTN2 long   reset the error counters
-// Serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3 + re-init, c colour flash, ? help. One line per read (2 s):
-//   A t rh dp [ok/nack/crc] | B ... | dDP spread
+// Serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3 + re-init, c colour flash,
+//         s I2C scan, h sensor reset + heater off, ? help.
+// One line per read (2 s): A t rh dp st=<status> [ok/trig nack/read nack/crc/timeout] | B ... | dT dDP
+// Errors name the Wire code: trig e2 = address NACK (wiring, ADDR pin, power), e3 = data NACK, e5 = timeout;
+// "read nack" = no data 20 ms after the trigger. st bit 13 = heater on, bit 4 = sensor reset since last clear.
 // LED: green flash per read with both valid, yellow if one missing, red if none.
 // Pass: both read every 2 s with no NACK/CRC for 10+ min, same air -> T within ~0.3 °C, DP within ~1 °C,
 // breathing on one sensor moves only that column.
@@ -40,11 +43,14 @@ uint8_t spiMode = SPI_MODE0;    // modules without a CS pin need SPI_MODE3
 struct Sht {
   const char *name;
   uint8_t addr;
-  bool trig, ok;
-  uint16_t good, nack, crc;
+  bool ok;
+  uint8_t err;                 // last result: 0 ok, 1..5 Wire code of the trigger, 10 read NACK, 11 CRC, 12 timeout
+  uint16_t good, nackT, nackR, crc, tmo;
+  uint16_t status;             // status register (0xF32D), 0xFFFF = not readable
   float t, rh, dp;
 };
 Sht sht[2] = {{"A  0x44", 0x44}, {"B  0x45", 0x45}};
+enum { E_READ = 10, E_CRC = 11, E_TMO = 12 };
 
 // ---------------- SHT31 ----------------
 uint8_t crc8(const uint8_t *d, uint8_t n) {
@@ -62,22 +68,44 @@ float dewPoint(float t, float rh) {
   return b * g / (a - g);
 }
 
+// Sends a 16-bit command. Returns the Wire code (0 ok, 2 address NACK, 3 data NACK, 5 timeout).
+uint8_t command(uint8_t addr, uint16_t cmd) {
+  Wire.clearWireTimeoutFlag();
+  Wire.beginTransmission(addr);
+  Wire.write((uint8_t)(cmd >> 8));
+  Wire.write((uint8_t)cmd);
+  uint8_t e = Wire.endTransmission();
+  return Wire.getWireTimeoutFlag() ? 5 : e;
+}
+
 void trigger(Sht &s) {   // single shot, high repeatability, no clock stretching
-  Wire.beginTransmission(s.addr);
-  Wire.write((uint8_t)0x24);
-  Wire.write((uint8_t)0x00);
-  s.trig = Wire.endTransmission() == 0;
+  s.err = command(s.addr, 0x2400);
+  if (s.err) {
+    if (s.err == 5) s.tmo++; else s.nackT++;
+  }
+}
+
+// Status register; 0xFFFF if it can't be read.
+uint16_t readStatus(uint8_t addr) {
+  uint8_t b[3];
+  if (command(addr, 0xF32D) || Wire.requestFrom(addr, (uint8_t)3) != 3) return 0xFFFF;
+  for (uint8_t i = 0; i < 3; i++) b[i] = Wire.read();
+  return crc8(b, 2) == b[2] ? (b[0] << 8) | b[1] : 0xFFFF;
 }
 
 void fetch(Sht &s) {
   uint8_t b[6];
   s.ok = false;
-  if (!s.trig || Wire.requestFrom(s.addr, (uint8_t)6) != 6) {
-    s.nack++;
+  if (s.err) return;   // trigger already failed (counted there)
+  Wire.clearWireTimeoutFlag();
+  if (Wire.requestFrom(s.addr, (uint8_t)6) != 6) {
+    if (Wire.getWireTimeoutFlag()) { s.err = E_TMO; s.tmo++; }
+    else { s.err = E_READ; s.nackR++; }
     return;
   }
   for (uint8_t i = 0; i < 6; i++) b[i] = Wire.read();
   if (crc8(b, 2) != b[2] || crc8(b + 3, 2) != b[5]) {
+    s.err = E_CRC;
     s.crc++;
     return;
   }
@@ -86,6 +114,43 @@ void fetch(Sht &s) {
   s.dp = dewPoint(s.t, s.rh);
   s.ok = true;
   s.good++;
+  s.status = readStatus(s.addr);
+}
+
+// Soft reset, heater off, clear status. A heater left on (or a sensor in a strange state) reads far too hot.
+void sensorInit(Sht &s) {
+  uint8_t e = command(s.addr, 0x30A2);   // soft reset
+  delay(2);
+  command(s.addr, 0x3066);               // heater off
+  command(s.addr, 0x3041);               // clear status
+  s.status = readStatus(s.addr);
+  Serial.print(s.name); Serial.print(F(": reset ")); Serial.print(e ? F("NACK e") : F("ok")); if (e) Serial.print(e);
+  Serial.print(F(", status 0x")); Serial.println(s.status, HEX);
+}
+
+void scan() {
+  Serial.print(F("I2C scan:"));
+  uint8_t n = 0;
+  for (uint8_t a = 1; a < 127; a++) {
+    Wire.beginTransmission(a);
+    if (Wire.endTransmission() == 0) {
+      Serial.print(F(" 0x")); Serial.print(a, HEX);
+      n++;
+    }
+  }
+  Serial.println(n ? "" : " nothing");
+}
+
+const char *errText(const Sht &s) {
+  switch (s.err) {
+    case 0: return (s.status != 0xFFFF && (s.status & 0x2000)) ? "HEATER ON" : "OK";
+    case 2: return "NO ACK";
+    case 3: return "DATA NACK";
+    case 5: case E_TMO: return "TIMEOUT";
+    case E_READ: return "READ NACK";
+    case E_CRC: return "CRC FAIL";
+    default: return "BUS ERR";
+  }
 }
 
 void printRead() {
@@ -93,9 +158,14 @@ void printRead() {
     Serial.print(s.name[0]); Serial.print(' ');
     if (s.ok) {
       Serial.print(s.t, 2); Serial.print(F(" C ")); Serial.print(s.rh, 1); Serial.print(F(" % DP ")); Serial.print(s.dp, 2);
-    } else Serial.print(s.trig ? F("CRC/READ FAIL") : F("NACK"));
-    Serial.print(F(" [")); Serial.print(s.good); Serial.print('/'); Serial.print(s.nack); Serial.print('/');
-    Serial.print(s.crc); Serial.print(F("] | "));
+      Serial.print(F(" st=")); Serial.print(s.status, HEX);
+    } else {
+      Serial.print(errText(s));
+      if (s.err < 10) { Serial.print(F(" (trig e")); Serial.print(s.err); Serial.print(')'); }
+    }
+    Serial.print(F(" [")); Serial.print(s.good); Serial.print('/'); Serial.print(s.nackT); Serial.print('/');
+    Serial.print(s.nackR); Serial.print('/'); Serial.print(s.crc); Serial.print('/'); Serial.print(s.tmo);
+    Serial.print(F("] | "));
   }
   if (sht[0].ok && sht[1].ok) {
     Serial.print(F("dT ")); Serial.print(sht[0].t - sht[1].t, 2);
@@ -179,9 +249,11 @@ void drawLive() {
     field(i * 5 + 0, F_BIG, x0 + 8, 44, s.ok ? C_WHT : C_DG, num(b, s.t, s.ok, 2, "\xF8"), 144);
     field(i * 5 + 1, F_VALUE, x0 + 70, 71, C_WHT, num(b, s.rh, s.ok, 1, " %"), 82, 'r');
     field(i * 5 + 2, F_VALUE, x0 + 70, 89, C_WHT, num(b, s.dp, s.ok, 2, "\xF8" "C"), 82, 'r');
-    snprintf(b, sizeof(b), "ok %u  nack %u  crc %u", s.good, s.nack, s.crc);
-    field(i * 5 + 3, F_LABEL, x0 + 8, 111, (s.nack || s.crc) ? C_HOT : C_LG, b, 146);
-    field(i * 5 + 4, F_LABEL, x0 + 98, 24, s.ok ? C_LG : C_HOT, s.ok ? "OK" : s.trig ? "CRC FAIL" : "NO ACK", 54, 'r');
+    uint16_t bad = s.nackT + s.nackR + s.crc + s.tmo;
+    snprintf(b, sizeof(b), "ok %u  nack %u/%u  crc %u", s.good, s.nackT, s.nackR + s.tmo, s.crc);   // trig/read
+    field(i * 5 + 3, F_LABEL, x0 + 8, 111, bad ? C_HOT : C_LG, b, 146);
+    const char *e = errText(s);
+    field(i * 5 + 4, F_LABEL, x0 + 82, 24, e[0] == 'O' ? C_LG : C_HOT, e, 70, 'r');
   }
   bool both = sht[0].ok && sht[1].ok;
   float spread = fabs(sht[0].dp - sht[1].dp);
@@ -213,7 +285,9 @@ void redraw() {
 
 void help() {
   Serial.println(F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
-  Serial.println(F("serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3, c colour flash, ? help"));
+  Serial.println(F("serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3, c colour flash,"));
+  Serial.println(F("        s I2C scan, h sensor reset + heater off, ? help"));
+  Serial.println(F("read line: [ok/trig nack/read nack/crc/timeout]"));
   Serial.print(F("pins: CS 49, DC 53, MOSI 51, SCK 52, RES ")); Serial.print(TFT_RST);
   Serial.print(F(" | SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
 }
@@ -236,6 +310,8 @@ void setup() {
   Wire.begin();
   Wire.setClock(50000);
   Wire.setWireTimeout(5000, true);
+  scan();
+  for (Sht &s : sht) sensorInit(s);
   gfx = &tft;
   uint32_t t0 = millis();
   initPanel();
@@ -257,10 +333,12 @@ void loop() {
   if (c == 'i') { inv = !inv; tft.invertDisplay(inv); }
   if (c == 'b') { bgr = !bgr; applyOrientation(); }
   if (c == 'r') {
-    for (Sht &s : sht) s.good = s.nack = s.crc = 0;
+    for (Sht &s : sht) s.good = s.nackT = s.nackR = s.crc = s.tmo = 0;
     Serial.println(F("--- counters reset ---"));
   }
   if (c == '?') help();
+  if (c == 's') scan();
+  if (c == 'h') for (Sht &s : sht) sensorInit(s);
   if (c == 'm') {
     spiMode = spiMode == SPI_MODE0 ? SPI_MODE3 : SPI_MODE0;
     Serial.print(F("SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
@@ -275,19 +353,25 @@ void loop() {
   if (c == 'i' || c == 'b') { Serial.print(F("invert ")); Serial.print(inv); Serial.print(F(" BGR ")); Serial.println(bgr); }
   if (c == 'p' || c == 'i' || c == 'b') redraw();
 
-  // read cycle without delay(): trigger both, fetch 20 ms later, every 2 s
-  static uint32_t trigAt, ledAt;
-  static bool waiting;
-  if (!waiting && now - trigAt >= 2000) {
-    for (Sht &s : sht) trigger(s);
-    trigAt = now;
-    waiting = true;
-  }
-  if (waiting && now - trigAt >= 20) {
-    for (Sht &s : sht) fetch(s);
-    waiting = false;
-    printRead();
-    ledAt = now;
+  // read cycle without delay(), one sensor at a time: A trigger, 20 ms, A fetch + B trigger, 20 ms, B fetch.
+  // Every 2 s. Sequential so a sensor that drags the bus can't take the other one's read with it.
+  static uint32_t cycleAt, stepAt, ledAt;
+  static uint8_t stage;   // 0 idle, 1 A measuring, 2 B measuring
+  if (stage == 0 && now - cycleAt >= 2000) {
+    cycleAt = stepAt = now;
+    trigger(sht[0]);
+    stage = 1;
+  } else if (stage && millis() - stepAt >= 20) {
+    fetch(sht[stage - 1]);
+    if (stage == 1) {
+      trigger(sht[1]);
+      stepAt = millis();
+      stage = 2;
+    } else {
+      stage = 0;
+      printRead();
+      ledAt = now;
+    }
   }
   if (ledAt && now - ledAt >= 40) {
     benchLed(0, 0, 0);

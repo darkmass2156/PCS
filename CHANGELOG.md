@@ -25,6 +25,16 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 ---
 
+## BENCH 1.3 fix 2 — 2026-10-26
+First run on the bench: display OK, but ~60 % failed SHT reads and sensor A at 67 °C / 17.6 % (valid CRC).
+### Fixed / added (`12_disp170_sht31`)
+- On-screen status said "CRC FAIL" for a read NACK. Errors are now split: trigger NACK (with the Wire code:
+  e2 address, e3 data, e5 timeout), read NACK, CRC, timeout; serial `[ok/trig/read/crc/timeout]`.
+- Sensors are soft-reset, heater off and status cleared at boot (and on serial `h`); the status register is
+  read after each good read and "HEATER ON" shown if bit 13 is set.
+- Reads are sequential (A, then B) instead of both triggered together.
+- I2C scan at boot and on serial `s`.
+
 ## BENCH 1.3 fix — 2026-10-26
 ### Fixed
 - `12_disp170_sht31` black screen with backlight on: `TFT_RST` defaulted to -1, and on a breadboard the module's
