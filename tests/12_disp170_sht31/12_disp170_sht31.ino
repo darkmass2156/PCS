@@ -1,8 +1,16 @@
 // 12_disp170_sht31 — the 1.9" ST7789 (170x320, used landscape 320x170) and the in-case SHT31s.
-// SENSORS 1: one sensor (SINGLE_ADDR; BTN2 long / serial a switches 0x44 <-> 0x45), with raw values and the
+// SENSORS 1: one sensor (SINGLE_ADDR; BTN2 short / serial a switches 0x44 <-> 0x45), with raw values and the
 //            status register on screen. Use it to test each module on its own.
 // SENSORS 2: A (0x44) and B (0x45) side by side, DP spread and T A-B.
-// Live T / RH / dew point on the screen and on Serial, plus a panel check page.
+// Live T / RH / dew point on the screen and on Serial, a night log in EEPROM, and a panel check page.
+//
+// Night log (EEPROM, survives power loss and resets):
+//   Every LOG_INTERVAL_S the average T and RH of A and B since the last sample (4 bytes: T 0.2 °C steps over
+//   -10..40.6 °C, RH 0.5 % steps). Ring of 1016 samples = 16.9 h at 60 s; when full the oldest are overwritten.
+//   EEPROM 16..4095 only (the controller firmware keeps its mode/splash bytes at 0..3).
+//   BTN1 long starts a NEW log (erases the old one), BTN2 long stops it. A reset or power cut while running
+//   resumes logging after boot with a gap marker, so opening the serial monitor (DTR reset) is safe.
+//   Serial d dumps CSV (oldest first): sample, minutes, A_T, A_RH, B_T, B_RH. Copy it into a spreadsheet.
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
 //
 // Wiring (same pins as the controller, so it also runs on the finished box with the 1.9" on C4):
@@ -14,12 +22,13 @@
 //            A: ADDR to GND = 0x44, B: ADDR to VIN = 0x45.
 //
 // Buttons:
-//   BTN1 short  page: live readings <-> panel check (frame, RGB bars)
-//   BTN2 short  invert on/off (colours negative -> toggle)
-//   BTN1 long   BGR on/off (red and blue swapped -> toggle)
-//   BTN2 long   SENSORS 1: switch address 0x44 <-> 0x45 (counters reset) | SENSORS 2: reset the error counters
+//   BTN1 short  page: live readings -> log charts -> panel check (frame, RGB bars)
+//   BTN2 short  SENSORS 1: switch address 0x44 <-> 0x45 (counters reset) | SENSORS 2: reset the error counters
+//   BTN1 long   start a new log (erases the previous one)
+//   BTN2 long   stop the log
 // Serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3 + re-init, c colour flash,
-//         s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1), ? help.
+//         s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1),
+//         l start log, x stop log, d dump log as CSV, e erase log, ? help.
 // One line per read (2 s): A t rh dp st=<status> [ok/trig nack/read nack/crc/timeout] | B ... | dT dDP
 // Errors name the Wire code: trig e2 = address NACK (wiring, ADDR pin, power), e3 = data NACK, e5 = timeout;
 // "read nack" = no data 20 ms after the trigger. st bit 13 = heater on, bit 4 = sensor reset since last clear.
@@ -29,12 +38,14 @@
 
 #include <SPI.h>
 #include <Wire.h>
+#include <EEPROM.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
 #include "bench.h"
 #include "scr_gfx.h"
 
-#define SENSORS 1           // 1 = one sensor, 2 = A and B
+#define SENSORS 2           // 1 = one sensor, 2 = A and B
+#define LOG_INTERVAL_S 60   // night log: seconds per sample (1016 samples: 60 s = 16.9 h, 90 s = 25 h)
 #define SINGLE_ADDR 0x44    // SENSORS 1: address at boot (0x44 ADDR to GND, 0x45 ADDR to VIN)
 #define TFT_RST 48          // pin wired to the module's RES (via divider), or -1
 #define ROTATION 1          // 3 = landscape upside down
@@ -42,7 +53,7 @@ const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);
 bool inv = true, bgr = false;   // real ST7789 defaults (config.h: DISP_INVERT 1, DISP_BGR 0)
-uint8_t page = 0;               // 0 live, 1 panel check
+uint8_t page = 0;               // 0 live, 1 log, 2 panel check
 uint8_t spiMode = SPI_MODE0;    // modules without a CS pin need SPI_MODE3
 
 struct Sht {
@@ -192,6 +203,165 @@ void printRead() {
   if (n == NS) benchLed(0, 60, 0); else if (n) benchLed(120, 70, 0); else benchLed(150, 0, 0);
 }
 
+// ---------------- night log (EEPROM) ----------------
+// Header at LOG_BASE: 'P' 'L' version running interval(2) head(2) count(2). Samples from LOG_DATA, 4 bytes:
+// A_T A_RH B_T B_RH. T byte = (t + 10) * 5 (0..253), RH byte = rh * 2 (0..200), 0xFF = no valid read,
+// A_T = 0xFE = gap (reset / power cut while logging).
+#define LOG_BASE 16
+#define LOG_DATA 32
+#define LOG_CAP ((4096 - LOG_DATA) / 4)
+#define LOG_INVALID 0xFF
+#define LOG_GAP 0xFE
+
+struct LogState {
+  bool valid, running;
+  uint16_t interval, head, count;
+  uint32_t lastAt;
+  float sumT[2], sumRH[2];
+  uint8_t n[2];
+} lg;
+
+uint16_t eeRead16(int a) { return EEPROM.read(a) | (EEPROM.read(a + 1) << 8); }
+void eeWrite16(int a, uint16_t v) {
+  EEPROM.update(a, v & 0xFF);
+  EEPROM.update(a + 1, v >> 8);
+}
+
+void logSaveHeader() {
+  EEPROM.update(LOG_BASE, 'P');
+  EEPROM.update(LOG_BASE + 1, 'L');
+  EEPROM.update(LOG_BASE + 2, 1);
+  EEPROM.update(LOG_BASE + 3, lg.running);
+  eeWrite16(LOG_BASE + 4, lg.interval);
+  eeWrite16(LOG_BASE + 6, lg.head);
+  eeWrite16(LOG_BASE + 8, lg.count);
+}
+
+void logClearSums() {
+  for (uint8_t i = 0; i < 2; i++) lg.sumT[i] = lg.sumRH[i] = lg.n[i] = 0;
+}
+
+void logAppend(const uint8_t *rec) {
+  int a = LOG_DATA + 4 * lg.head;
+  for (uint8_t i = 0; i < 4; i++) EEPROM.update(a + i, rec[i]);
+  lg.head = (lg.head + 1) % LOG_CAP;
+  if (lg.count < LOG_CAP) lg.count++;
+  eeWrite16(LOG_BASE + 6, lg.head);
+  eeWrite16(LOG_BASE + 8, lg.count);
+}
+
+// Boot: pick up an existing log; if it was running, mark the gap and keep going.
+void logBoot(uint32_t now) {
+  lg.valid = EEPROM.read(LOG_BASE) == 'P' && EEPROM.read(LOG_BASE + 1) == 'L' && EEPROM.read(LOG_BASE + 2) == 1;
+  lg.running = false;
+  if (!lg.valid) {
+    Serial.println(F("log: none (BTN1 long / l starts one)"));
+    return;
+  }
+  lg.running = EEPROM.read(LOG_BASE + 3);
+  lg.interval = eeRead16(LOG_BASE + 4);
+  lg.head = eeRead16(LOG_BASE + 6) % LOG_CAP;
+  lg.count = eeRead16(LOG_BASE + 8);
+  if (lg.count > LOG_CAP || !lg.interval) {
+    lg.valid = lg.running = false;
+    Serial.println(F("log: header damaged, ignored"));
+    return;
+  }
+  lg.lastAt = now;
+  logClearSums();
+  if (lg.running) {
+    const uint8_t gap[4] = {LOG_GAP, LOG_GAP, LOG_GAP, LOG_GAP};
+    logAppend(gap);
+  }
+  Serial.print(F("log: ")); Serial.print(lg.count); Serial.print(F(" samples, ")); Serial.print(lg.interval);
+  Serial.println(lg.running ? F(" s, was running: resumed after a gap marker") : F(" s, stopped (d dumps it)"));
+}
+
+void logStart(uint32_t now) {
+  lg.valid = lg.running = true;
+  lg.interval = LOG_INTERVAL_S;
+  lg.head = lg.count = 0;
+  lg.lastAt = now;
+  logClearSums();
+  logSaveHeader();
+  Serial.print(F("--- log started, every ")); Serial.print(lg.interval); Serial.print(F(" s, room for "));
+  Serial.print(LOG_CAP * (uint32_t)lg.interval / 3600.0f, 1); Serial.println(F(" h ---"));
+}
+
+void logStop() {
+  if (!lg.valid) return;
+  lg.running = false;
+  EEPROM.update(LOG_BASE + 3, 0);
+  Serial.print(F("--- log stopped, ")); Serial.print(lg.count); Serial.println(F(" samples (d dumps them) ---"));
+}
+
+void logErase() {
+  EEPROM.update(LOG_BASE, 0);
+  lg.valid = lg.running = false;
+  lg.count = 0;
+  Serial.println(F("--- log erased ---"));
+}
+
+// After every read cycle: add the valid readings; write a sample when the interval is up. True if written.
+bool logTick(uint32_t now) {
+  if (!lg.running) return false;
+  for (uint8_t i = 0; i < NS; i++)
+    if (sht[i].ok) {
+      lg.sumT[i] += sht[i].t;
+      lg.sumRH[i] += sht[i].rh;
+      lg.n[i]++;
+    }
+  if (now - lg.lastAt < lg.interval * 1000UL) return false;
+  lg.lastAt += lg.interval * 1000UL;
+  uint8_t rec[4] = {LOG_INVALID, LOG_INVALID, LOG_INVALID, LOG_INVALID};
+  for (uint8_t i = 0; i < NS; i++)
+    if (lg.n[i]) {
+      float t = lg.sumT[i] / lg.n[i], rh = lg.sumRH[i] / lg.n[i];
+      rec[2 * i] = constrain(lround((t + 10) * 5), 0, 253);
+      rec[2 * i + 1] = constrain(lround(rh * 2), 0, 200);
+    }
+  logClearSums();
+  logAppend(rec);
+  return true;
+}
+
+// Sample i of the log, oldest first.
+void logGet(uint16_t i, uint8_t *rec) {
+  int a = LOG_DATA + 4 * ((lg.head + LOG_CAP - lg.count + i) % LOG_CAP);
+  for (uint8_t k = 0; k < 4; k++) rec[k] = EEPROM.read(a + k);
+}
+
+float logT(uint8_t b) { return b / 5.0f - 10; }
+float logRH(uint8_t b) { return b / 2.0f; }
+
+void logDump() {
+  if (!lg.valid) {
+    Serial.println(F("# no log"));
+    return;
+  }
+  Serial.print(F("# PCS night log: ")); Serial.print(lg.count); Serial.print(F(" samples, every "));
+  Serial.print(lg.interval); Serial.print(F(" s, oldest first")); Serial.println(lg.running ? F(" (still running)") : F(""));
+  Serial.println(F("# T in 0.2 C steps, RH in 0.5 % steps, empty = no valid read; times after a gap are relative"));
+  Serial.println(F("sample,minutes,A_T,A_RH,B_T,B_RH"));
+  uint32_t secs = 0;
+  for (uint16_t i = 0; i < lg.count; i++) {
+    uint8_t r[4];
+    logGet(i, r);
+    if (r[0] == LOG_GAP) {
+      Serial.println(F("# gap: reset or power cut, time unknown"));
+      continue;
+    }
+    secs += lg.interval;
+    Serial.print(i); Serial.print(','); Serial.print(secs / 60.0f, 1);
+    for (uint8_t k = 0; k < 4; k++) {
+      Serial.print(',');
+      if (r[k] != LOG_INVALID) Serial.print(k % 2 ? logRH(r[k]) : logT(r[k]), 1);
+    }
+    Serial.println();
+  }
+  Serial.println(F("# end"));
+}
+
 // ---------------- display ----------------
 void applyOrientation() {   // as display.cpp: rotation, then MADCTL with BGR, then invert
   tft.setRotation(ROTATION);
@@ -256,6 +426,13 @@ void drawLiveStatic2() {
   ftxt(F_LABEL, 168, 136, C_LG, C_BLK, "T  A - B", 0);
 }
 
+void drawLogBadge() {   // live pages: "LOG n" next to the 1 Hz dot while logging
+  char b[16];
+  if (lg.running) snprintf(b, sizeof(b), "LOG %u", lg.count);
+  else b[0] = 0;
+  field(14, F_LABEL, 236, 3, C_HOT, b, 66, 'r');
+}
+
 void drawLive2() {
   char b[40], u[12];
   for (uint8_t i = 0; i < NS; i++) {
@@ -295,7 +472,7 @@ void drawLiveStatic1() {
 }
 
 void drawLive1() {
-  char b[64];
+  char b[80];
   Sht &s = sht[0];
   field(0, F_BIG, 8, 48, s.ok ? C_WHT : C_DG, num(b, s.t, s.ok, 2, "\xF8"), 160);
   const char *e = errText(s);
@@ -312,7 +489,7 @@ void drawLive1() {
   if (s.good) snprintf(b, sizeof(b), "raw  T 0x%04X   RH 0x%04X", s.rawT, s.rawRH);
   else strcpy(b, "raw  --");
   field(6, F_LABEL, 8, 153, C_DG, b, 170);
-  field(7, F_LABEL, 180, 153, C_DG, "BTN2 long: other address", 132, 'r');
+  field(7, F_LABEL, 180, 153, C_DG, "BTN2: other address", 132, 'r');
 }
 
 void drawLiveStatic() {
@@ -321,6 +498,7 @@ void drawLiveStatic() {
 
 void drawLive() {
   if (NS == 1) drawLive1(); else drawLive2();
+  drawLogBadge();
 }
 
 void switchAddr() {   // SENSORS 1: 0x44 <-> 0x45, counters and readings reset
@@ -333,6 +511,86 @@ void switchAddr() {   // SENSORS 1: 0x44 <-> 0x45, counters and readings reset
   if (page == 0) drawLiveStatic();
 }
 
+// Log page: state line, then T and RH over the whole log (A white / red, B blue / orange), auto-scaled.
+#define CH_X 34
+#define CH_W 282
+void logChart(int16_t y0, int16_t h, bool rh, const char *unit) {
+  tft.fillRect(0, y0, W, h + 1, C_BLK);
+  tft.drawRect(CH_X - 1, y0, CH_W + 2, h + 1, C_DG);
+  float lo = 1e9, hi = -1e9;
+  for (uint16_t i = 0; i < lg.count; i++) {
+    uint8_t r[4];
+    logGet(i, r);
+    if (r[0] == LOG_GAP) continue;
+    for (uint8_t k = rh; k < 4; k += 2)
+      if (r[k] != LOG_INVALID) {
+        float v = rh ? logRH(r[k]) : logT(r[k]);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+  }
+  char b[12];
+  if (lo > hi) {
+    ftxt(F_LABEL, CH_X + 8, y0 + h / 2 - 5, C_DG, C_BLK, lg.valid ? "no data yet" : "no log", 0);
+    ftxt(F_LABEL, 2, y0 + 2, C_LG, C_BLK, unit, 0);
+    return;
+  }
+  float span = rh ? 5 : 2;   // minimum scale
+  if (hi - lo < span) {
+    float m = (hi + lo) / 2;
+    lo = m - span / 2;
+    hi = m + span / 2;
+  }
+  ftxt(F_LABEL, 2, y0 + 2, C_LG, C_BLK, unit, 0);
+  ftxt(F_LABEL, 2, y0 + 14, C_WHT, C_BLK, dtostrf(hi, 0, rh ? 0 : 1, b), 30);
+  ftxt(F_LABEL, 2, y0 + h - 11, C_WHT, C_BLK, dtostrf(lo, 0, rh ? 0 : 1, b), 30);
+  static const uint16_t COL[2][2] = {{C_WHT, 0x867F}, {C_HOT, 0xFD20}};   // [rh][sensor]: A white / red, B blue / orange
+  int16_t prev[2] = {-1, -1};
+  uint16_t cols = lg.count < CH_W ? lg.count : CH_W;
+  for (uint16_t x = 0; x < cols; x++) {
+    uint8_t r[4];
+    logGet(lg.count <= CH_W ? x : (uint32_t)x * lg.count / CH_W, r);
+    if (r[0] == LOG_GAP) {
+      tft.drawFastVLine(CH_X + x, y0 + 1, h - 1, C_MAR);   // gap marker
+      prev[0] = prev[1] = -1;
+      continue;
+    }
+    for (uint8_t s = 0; s < 2; s++) {
+      uint8_t v = r[2 * s + rh];
+      if (v == LOG_INVALID) {
+        prev[s] = -1;
+        continue;
+      }
+      float f = rh ? logRH(v) : logT(v);
+      int16_t y = y0 + h - 1 - lround((f - lo) * (h - 3) / (hi - lo));
+      int16_t a = prev[s] < 0 ? y : prev[s];
+      tft.drawFastVLine(CH_X + x, a < y ? a : y, abs(y - a) + 1, COL[rh][s]);
+      prev[s] = y;
+    }
+  }
+}
+
+void drawLogHeader() {
+  char b[64];
+  if (!lg.valid) strcpy(b, "no log   -   BTN1 long starts one");
+  else {
+    uint32_t mins = (uint32_t)lg.count * lg.interval / 60;
+    snprintf(b, sizeof(b), "%s   %u:%02u h   %u / %u   every %u s", lg.running ? "LOGGING" : "STOPPED",
+             (unsigned)(mins / 60), (unsigned)(mins % 60), lg.count, (unsigned)LOG_CAP, lg.interval);
+  }
+  field(0, F_LABEL, 4, 3, lg.running ? C_HOT : C_LG, b, 300);
+}
+
+void drawLogPage() {
+  tft.fillScreen(C_BLK);
+  memset(cache, 0, sizeof(cache));
+  drawLogHeader();
+  tft.drawFastHLine(0, 16, W, C_DG);
+  logChart(20, 66, false, "T \xF8" "C");
+  logChart(90, 66, true, "RH %");
+  ftxt(F_LABEL, 4, 158, C_DG, C_BLK, "A white/red  B blue/orange   BTN1 long new   BTN2 long stop", 0);
+}
+
 void drawCheck() {
   tft.fillScreen(C_BLK);
   memset(cache, 0, sizeof(cache));
@@ -341,7 +599,7 @@ void drawCheck() {
   for (uint8_t i = 0; i < 3; i++) tft.fillRect(10, 28 + i * 30, W - 20, 24, c[i]);
   ftxt(F_VALUE, 10, 6, C_WHT, C_BLK, "320 x 170   bars: RED GREEN BLUE", 0);
   char b[40];
-  snprintf(b, sizeof(b), "invert %u   BGR %u   (BTN2 / BTN1 long)", inv, bgr);
+  snprintf(b, sizeof(b), "invert %u   BGR %u   (serial i / b)", inv, bgr);
   ftxt(F_LABEL, 10, 124, C_LG, C_BLK, b, 0);
   ftxt(F_LABEL, 10, 142, C_LG, C_BLK, "background black, frame on all 4 edges", 0);
 }
@@ -350,14 +608,16 @@ void redraw() {
   if (page == 0) {
     drawLiveStatic();
     drawLive();
-  } else drawCheck();
+  } else if (page == 1) drawLogPage();
+  else drawCheck();
 }
 
 void help() {
-  Serial.println(NS == 1 ? F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: other address")
-                         : F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
+  Serial.println(NS == 1 ? F("BTN1 short: page | BTN2 short: other address | BTN1 long: new log | BTN2 long: stop log")
+                         : F("BTN1 short: page | BTN2 short: reset counters | BTN1 long: new log | BTN2 long: stop log"));
   Serial.println(F("serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3, c colour flash,"));
-  Serial.println(F("        s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1), ? help"));
+  Serial.println(F("        s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1),"));
+  Serial.println(F("        l start log, x stop log, d dump log (CSV), e erase log, ? help"));
   Serial.println(F("read line: [ok/trig nack/read nack/crc/timeout]"));
   Serial.print(F("pins: CS 49, DC 53, MOSI 51, SCK 52, RES ")); Serial.print(TFT_RST);
   Serial.print(F(" | SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
@@ -384,6 +644,7 @@ void setup() {
   scan();
   if (NS == 1) snprintf(sht[0].name, sizeof(sht[0].name), "0x%02X", sht[0].addr);
   for (Sht &s : sht) sensorInit(s);
+  logBoot(millis());
   gfx = &tft;
   uint32_t t0 = millis();
   initPanel();
@@ -397,11 +658,16 @@ void loop() {
   benchButtonsUpdate();
   char c = 0;
   if (btn1.shortPress) c = 'p';
-  if (btn2.shortPress) c = 'i';
-  if (btn1.longPress) c = 'b';
-  if (btn2.longPress) c = NS == 1 ? 'a' : 'r';
+  if (btn2.shortPress) c = NS == 1 ? 'a' : 'r';
+  if (btn1.longPress) c = 'l';
+  if (btn2.longPress) c = 'x';
   if (!c && Serial.available()) c = Serial.read();
-  if (c == 'p') page ^= 1;
+  if (c == 'p') page = (page + 1) % 3;
+  if (c == 'l') logStart(now);
+  if (c == 'x') logStop();
+  if (c == 'e') logErase();
+  if (c == 'd') logDump();
+  if ((c == 'l' || c == 'x' || c == 'e') && page == 1) drawLogPage();
   if (c == 'i') { inv = !inv; tft.invertDisplay(inv); }
   if (c == 'b') { bgr = !bgr; applyOrientation(); }
   if (c == 'r') {
@@ -444,6 +710,7 @@ void loop() {
       stage = 0;
       printRead();
       ledAt = now;
+      if (logTick(now) && page == 1) drawLogPage();   // new sample: redraw the charts (~0.3 s)
     }
   }
   if (ledAt && now - ledAt >= 40) {
@@ -451,6 +718,7 @@ void loop() {
     ledAt = 0;
   }
 
+  if (page == 1) drawLogHeader();
   if (page == 0) {
     drawLive();   // only changed fields are sent
     bool lit = (now / 1000) & 1;   // 1 Hz dot: the screen is alive

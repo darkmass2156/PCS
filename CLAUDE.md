@@ -346,9 +346,12 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 11. `10_v2_calibration` — t_open/t_close (button-marked), backlash, indicator linearity, and on the filled
     loop the flow characteristic f(θ) = (T1 − T2)/(T1 − T3). Output → V2 tunables and the θ equation.
 12. `11_ui_dev` — the real dashboard screens and boot sequence with fake data (mode/scenario on the buttons).
-13. `12_disp170_sht31` — the 1.9" 170x320 panel (landscape 320x170) and the SHT31s. `SENSORS 1` (default): one
-    sensor, BTN2 long switches 0x44 ⇄ 0x45, raw ticks + status register shown. `SENSORS 2`: A and B side by side
-    with DP spread. Split NACK/CRC/timeout counters, I2C scan, sensor reset + heater off; panel check page.
+13. `12_disp170_sht31` — the 1.9" 170x320 panel (landscape 320x170) and the SHT31s. `SENSORS 2` (default): A and B
+    side by side with DP spread. `SENSORS 1`: one sensor, BTN2 switches 0x44 ⇄ 0x45, raw ticks + status register.
+    Split NACK/CRC/timeout counters, I2C scan, sensor reset + heater off; panel check page.
+    Night log in EEPROM 16..4095 (never 0..3, the firmware's bytes): T/RH of A and B averaged per `LOG_INTERVAL_S`
+    (60 s), 4 bytes/sample, ring of 1016 (16.9 h). BTN1 long new log, BTN2 long stop; survives resets (gap marker);
+    log page with T/RH charts; serial `d` dumps CSV.
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the

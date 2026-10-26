@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-26 | — | — | 1.4 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-26 | — | — | 1.3 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-17 | 0.4.4 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.4` |
 | 2026-10-17 | 0.4.3 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.3` |
@@ -24,6 +25,23 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## BENCH 1.4 — 2026-10-26
+Host syntax check (both sensor modes) and a host run of the log: 600 samples with a reset and a B dropout,
+CSV dump and log page checked (`docs/display/preview_disp170_log.png`). Not yet compiled for AVR.
+
+### Added (`12_disp170_sht31`)
+- Night log in EEPROM: every `LOG_INTERVAL_S` (60 s) the average T / RH of A and B, 4 bytes per sample
+  (T 0.2 °C over −10…40.6 °C, RH 0.5 %), ring of 1016 samples = 16.9 h. EEPROM 16..4095 only, the firmware's
+  bytes 0..3 stay untouched. A reset or power cut while logging resumes with a gap marker, so opening the serial
+  monitor doesn't lose or end the log. Serial `d` dumps CSV (sample, minutes, A_T, A_RH, B_T, B_RH), `l` / `x` /
+  `e` start / stop / erase.
+- Log page (BTN1 cycles live → log → panel check): state, duration, fill, and T and RH charts over the whole log,
+  auto-scaled, gaps marked. "LOG n" badge on the live page while logging.
+
+### Changed
+- Buttons: BTN2 short = other address (SENSORS 1) / reset counters (SENSORS 2), BTN1 long = new log,
+  BTN2 long = stop log. Invert / BGR are serial only (`i` / `b`). `SENSORS 2` is the default again.
 
 ## BENCH 1.3 fix 3 — 2026-10-26
 ### Added (`12_disp170_sht31`)
