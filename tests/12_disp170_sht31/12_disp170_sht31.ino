@@ -1,5 +1,8 @@
-// 12_disp170_sht31 — the 1.9" ST7789 (170x320, used landscape 320x170) and the two in-case SHT31s together.
-// Live T / RH / dew point of A (0x44) and B (0x45) on the screen and on Serial, plus a panel check page.
+// 12_disp170_sht31 — the 1.9" ST7789 (170x320, used landscape 320x170) and the in-case SHT31s.
+// SENSORS 1: one sensor (SINGLE_ADDR; BTN2 long / serial a switches 0x44 <-> 0x45), with raw values and the
+//            status register on screen. Use it to test each module on its own.
+// SENSORS 2: A (0x44) and B (0x45) side by side, DP spread and T A-B.
+// Live T / RH / dew point on the screen and on Serial, plus a panel check page.
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
 //
 // Wiring (same pins as the controller, so it also runs on the finished box with the 1.9" on C4):
@@ -14,9 +17,9 @@
 //   BTN1 short  page: live readings <-> panel check (frame, RGB bars)
 //   BTN2 short  invert on/off (colours negative -> toggle)
 //   BTN1 long   BGR on/off (red and blue swapped -> toggle)
-//   BTN2 long   reset the error counters
+//   BTN2 long   SENSORS 1: switch address 0x44 <-> 0x45 (counters reset) | SENSORS 2: reset the error counters
 // Serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3 + re-init, c colour flash,
-//         s I2C scan, h sensor reset + heater off, ? help.
+//         s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1), ? help.
 // One line per read (2 s): A t rh dp st=<status> [ok/trig nack/read nack/crc/timeout] | B ... | dT dDP
 // Errors name the Wire code: trig e2 = address NACK (wiring, ADDR pin, power), e3 = data NACK, e5 = timeout;
 // "read nack" = no data 20 ms after the trigger. st bit 13 = heater on, bit 4 = sensor reset since last clear.
@@ -31,6 +34,8 @@
 #include "bench.h"
 #include "scr_gfx.h"
 
+#define SENSORS 1           // 1 = one sensor, 2 = A and B
+#define SINGLE_ADDR 0x44    // SENSORS 1: address at boot (0x44 ADDR to GND, 0x45 ADDR to VIN)
 #define TFT_RST 48          // pin wired to the module's RES (via divider), or -1
 #define ROTATION 1          // 3 = landscape upside down
 const uint16_t W = 320, H = 170;
@@ -41,15 +46,21 @@ uint8_t page = 0;               // 0 live, 1 panel check
 uint8_t spiMode = SPI_MODE0;    // modules without a CS pin need SPI_MODE3
 
 struct Sht {
-  const char *name;
+  char name[8];
   uint8_t addr;
   bool ok;
   uint8_t err;                 // last result: 0 ok, 1..5 Wire code of the trigger, 10 read NACK, 11 CRC, 12 timeout
   uint16_t good, nackT, nackR, crc, tmo;
   uint16_t status;             // status register (0xF32D), 0xFFFF = not readable
   float t, rh, dp;
+  uint16_t rawT, rawRH;        // sensor ticks as received (CRC checked)
 };
+#if SENSORS == 1
+Sht sht[1] = {{"0x44", SINGLE_ADDR}};
+#else
 Sht sht[2] = {{"A  0x44", 0x44}, {"B  0x45", 0x45}};
+#endif
+const uint8_t NS = SENSORS;
 enum { E_READ = 10, E_CRC = 11, E_TMO = 12 };
 
 // ---------------- SHT31 ----------------
@@ -109,8 +120,10 @@ void fetch(Sht &s) {
     s.crc++;
     return;
   }
-  s.t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
-  s.rh = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
+  s.rawT = (b[0] << 8) | b[1];
+  s.rawRH = (b[3] << 8) | b[4];
+  s.t = -45.0f + 175.0f * s.rawT / 65535.0f;   // datasheet conversion
+  s.rh = 100.0f * s.rawRH / 65535.0f;
   s.dp = dewPoint(s.t, s.rh);
   s.ok = true;
   s.good++;
@@ -155,10 +168,11 @@ const char *errText(const Sht &s) {
 
 void printRead() {
   for (Sht &s : sht) {
-    Serial.print(s.name[0]); Serial.print(' ');
+    Serial.print(s.name); Serial.print(' ');
     if (s.ok) {
       Serial.print(s.t, 2); Serial.print(F(" C ")); Serial.print(s.rh, 1); Serial.print(F(" % DP ")); Serial.print(s.dp, 2);
       Serial.print(F(" st=")); Serial.print(s.status, HEX);
+      Serial.print(F(" raw ")); Serial.print(s.rawT, HEX); Serial.print('/'); Serial.print(s.rawRH, HEX);
     } else {
       Serial.print(errText(s));
       if (s.err < 10) { Serial.print(F(" (trig e")); Serial.print(s.err); Serial.print(')'); }
@@ -167,14 +181,15 @@ void printRead() {
     Serial.print(s.nackR); Serial.print('/'); Serial.print(s.crc); Serial.print('/'); Serial.print(s.tmo);
     Serial.print(F("] | "));
   }
-  if (sht[0].ok && sht[1].ok) {
-    Serial.print(F("dT ")); Serial.print(sht[0].t - sht[1].t, 2);
-    Serial.print(F(" dDP ")); Serial.print(fabs(sht[0].dp - sht[1].dp), 2);
-    if (fabs(sht[0].dp - sht[1].dp) > 2.0f) Serial.print(F(" > 2 C ALARM"));
+  if (NS == 2 && sht[0].ok && sht[NS - 1].ok) {
+    Serial.print(F("dT ")); Serial.print(sht[0].t - sht[NS - 1].t, 2);
+    Serial.print(F(" dDP ")); Serial.print(fabs(sht[0].dp - sht[NS - 1].dp), 2);
+    if (fabs(sht[0].dp - sht[NS - 1].dp) > 2.0f) Serial.print(F(" > 2 C ALARM"));
   }
   Serial.println();
-  uint8_t n = sht[0].ok + sht[1].ok;
-  if (n == 2) benchLed(0, 60, 0); else if (n) benchLed(120, 70, 0); else benchLed(150, 0, 0);
+  uint8_t n = 0;
+  for (Sht &s : sht) n += s.ok;
+  if (n == NS) benchLed(0, 60, 0); else if (n) benchLed(120, 70, 0); else benchLed(150, 0, 0);
 }
 
 // ---------------- display ----------------
@@ -224,14 +239,14 @@ char *num(char *out, float v, bool ok, uint8_t dec, const char *unit) {
   return out;
 }
 
-void drawLiveStatic() {
+void drawLiveStatic2() {
   tft.fillScreen(C_BLK);
   memset(cache, 0, sizeof(cache));
   ftxt(F_LABEL, 4, 3, C_LG, C_BLK, "SHT31 A / B   -   1.9\"  320 x 170", 0);
   tft.drawFastHLine(0, 16, W, C_DG);
   tft.drawFastVLine(160, 20, 106, C_DG);
   tft.drawFastHLine(0, 129, W, C_DG);
-  for (uint8_t i = 0; i < 2; i++) {
+  for (uint8_t i = 0; i < NS; i++) {
     int16_t x0 = i * 160;
     ftxt(F_VALUE, x0 + 8, 21, C_WHT, C_BLK, sht[i].name, 0);
     ftxt(F_LABEL, x0 + 8, 74, C_LG, C_BLK, "RH", 0);
@@ -241,9 +256,9 @@ void drawLiveStatic() {
   ftxt(F_LABEL, 168, 136, C_LG, C_BLK, "T  A - B", 0);
 }
 
-void drawLive() {
+void drawLive2() {
   char b[40], u[12];
-  for (uint8_t i = 0; i < 2; i++) {
+  for (uint8_t i = 0; i < NS; i++) {
     Sht &s = sht[i];
     int16_t x0 = i * 160;
     field(i * 5 + 0, F_BIG, x0 + 8, 44, s.ok ? C_WHT : C_DG, num(b, s.t, s.ok, 2, "\xF8"), 144);
@@ -255,12 +270,67 @@ void drawLive() {
     const char *e = errText(s);
     field(i * 5 + 4, F_LABEL, x0 + 82, 24, e[0] == 'O' ? C_LG : C_HOT, e, 70, 'r');
   }
-  bool both = sht[0].ok && sht[1].ok;
-  float spread = fabs(sht[0].dp - sht[1].dp);
+  bool both = sht[0].ok && sht[NS - 1].ok;
+  float spread = fabs(sht[0].dp - sht[NS - 1].dp);
   field(10, F_VALUE, 70, 133, both && spread > 2.0f ? C_HOT : C_WHT, num(b, spread, both, 2, "\xF8" "C"), 82, 'r');
-  field(11, F_VALUE, 230, 133, C_WHT, num(u, sht[0].t - sht[1].t, both, 2, "\xF8" "C"), 82, 'r');
+  field(11, F_VALUE, 230, 133, C_WHT, num(u, sht[0].t - sht[NS - 1].t, both, 2, "\xF8" "C"), 82, 'r');
   field(12, F_LABEL, 8, 155, both && spread > 2.0f ? C_HOT : C_DG,
         both ? (spread > 2.0f ? "spread > 2 \xF8" "C: firmware alarm" : "spread within 2 \xF8" "C") : "need both sensors", 200);
+}
+
+// SENSORS 1: one sensor, big temperature left, RH / DP / status register right, counters and raw ticks below.
+void drawLiveStatic1() {
+  char b[40];
+  tft.fillScreen(C_BLK);
+  memset(cache, 0, sizeof(cache));
+  ftxt(F_LABEL, 4, 3, C_LG, C_BLK, "SHT31 single   -   1.9\"  320 x 170", 0);
+  tft.drawFastHLine(0, 16, W, C_DG);
+  tft.drawFastVLine(172, 20, 106, C_DG);
+  tft.drawFastHLine(0, 129, W, C_DG);
+  snprintf(b, sizeof(b), "SHT31  %s", sht[0].name);
+  ftxt(F_VALUE, 8, 21, C_WHT, C_BLK, b, 160);
+  ftxt(F_LABEL, 180, 22, C_LG, C_BLK, "RH", 0);
+  ftxt(F_LABEL, 180, 58, C_LG, C_BLK, "Dew point", 0);
+  ftxt(F_LABEL, 180, 94, C_LG, C_BLK, "Status register", 0);
+}
+
+void drawLive1() {
+  char b[64];
+  Sht &s = sht[0];
+  field(0, F_BIG, 8, 48, s.ok ? C_WHT : C_DG, num(b, s.t, s.ok, 2, "\xF8"), 160);
+  const char *e = errText(s);
+  field(1, F_VALUE, 8, 86, e[0] == 'O' ? C_LG : C_HOT, e, 160);
+  field(2, F_VALUE, 180, 36, C_WHT, num(b, s.rh, s.ok, 1, " %"), 132, 'r');
+  field(3, F_VALUE, 180, 72, C_WHT, num(b, s.dp, s.ok, 2, "\xF8" "C"), 132, 'r');
+  bool heat = s.status != 0xFFFF && (s.status & 0x2000);
+  if (s.status == 0xFFFF) strcpy(b, "--");
+  else snprintf(b, sizeof(b), "0x%04X%s", s.status, heat ? " HEAT" : "");
+  field(4, F_VALUE, 180, 108, heat ? C_HOT : C_WHT, b, 132, 'r');
+  uint16_t bad = s.nackT + s.nackR + s.crc + s.tmo;
+  snprintf(b, sizeof(b), "ok %u   trig nack %u   read nack %u   crc %u   timeout %u", s.good, s.nackT, s.nackR, s.crc, s.tmo);
+  field(5, F_LABEL, 8, 135, bad ? C_HOT : C_LG, b, 304);
+  if (s.good) snprintf(b, sizeof(b), "raw  T 0x%04X   RH 0x%04X", s.rawT, s.rawRH);
+  else strcpy(b, "raw  --");
+  field(6, F_LABEL, 8, 153, C_DG, b, 170);
+  field(7, F_LABEL, 180, 153, C_DG, "BTN2 long: other address", 132, 'r');
+}
+
+void drawLiveStatic() {
+  if (NS == 1) drawLiveStatic1(); else drawLiveStatic2();
+}
+
+void drawLive() {
+  if (NS == 1) drawLive1(); else drawLive2();
+}
+
+void switchAddr() {   // SENSORS 1: 0x44 <-> 0x45, counters and readings reset
+  uint8_t a = sht[0].addr == 0x44 ? 0x45 : 0x44;
+  memset(&sht[0], 0, sizeof(Sht));
+  sht[0].addr = a;
+  snprintf(sht[0].name, sizeof(sht[0].name), "0x%02X", a);
+  Serial.print(F("--- sensor 0x")); Serial.print(a, HEX); Serial.println(F(" ---"));
+  sensorInit(sht[0]);
+  if (page == 0) drawLiveStatic();
 }
 
 void drawCheck() {
@@ -284,9 +354,10 @@ void redraw() {
 }
 
 void help() {
-  Serial.println(F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
+  Serial.println(NS == 1 ? F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: other address")
+                         : F("BTN1 short: page | BTN2 short: invert | BTN1 long: BGR | BTN2 long: reset counters"));
   Serial.println(F("serial: p page, i invert, b BGR, r reset counters, m SPI mode 0/3, c colour flash,"));
-  Serial.println(F("        s I2C scan, h sensor reset + heater off, ? help"));
+  Serial.println(F("        s I2C scan, h sensor reset + heater off, a switch address (SENSORS 1), ? help"));
   Serial.println(F("read line: [ok/trig nack/read nack/crc/timeout]"));
   Serial.print(F("pins: CS 49, DC 53, MOSI 51, SCK 52, RES ")); Serial.print(TFT_RST);
   Serial.print(F(" | SPI mode ")); Serial.println(spiMode == SPI_MODE0 ? 0 : 3);
@@ -311,6 +382,7 @@ void setup() {
   Wire.setClock(50000);
   Wire.setWireTimeout(5000, true);
   scan();
+  if (NS == 1) snprintf(sht[0].name, sizeof(sht[0].name), "0x%02X", sht[0].addr);
   for (Sht &s : sht) sensorInit(s);
   gfx = &tft;
   uint32_t t0 = millis();
@@ -327,7 +399,7 @@ void loop() {
   if (btn1.shortPress) c = 'p';
   if (btn2.shortPress) c = 'i';
   if (btn1.longPress) c = 'b';
-  if (btn2.longPress) c = 'r';
+  if (btn2.longPress) c = NS == 1 ? 'a' : 'r';
   if (!c && Serial.available()) c = Serial.read();
   if (c == 'p') page ^= 1;
   if (c == 'i') { inv = !inv; tft.invertDisplay(inv); }
@@ -338,6 +410,7 @@ void loop() {
   }
   if (c == '?') help();
   if (c == 's') scan();
+  if (c == 'a' && NS == 1) switchAddr();
   if (c == 'h') for (Sht &s : sht) sensorInit(s);
   if (c == 'm') {
     spiMode = spiMode == SPI_MODE0 ? SPI_MODE3 : SPI_MODE0;
@@ -363,10 +436,10 @@ void loop() {
     stage = 1;
   } else if (stage && millis() - stepAt >= 20) {
     fetch(sht[stage - 1]);
-    if (stage == 1) {
-      trigger(sht[1]);
+    if (stage < NS) {
+      trigger(sht[stage]);
       stepAt = millis();
-      stage = 2;
+      stage++;
     } else {
       stage = 0;
       printRead();

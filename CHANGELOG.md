@@ -25,6 +25,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 ---
 
+## BENCH 1.3 fix 3 — 2026-10-26
+### Added (`12_disp170_sht31`)
+- `SENSORS 1` (now the default): one sensor on its own screen, address `SINGLE_ADDR`, BTN2 long / serial `a`
+  switches 0x44 ⇄ 0x45 (counters reset, sensor re-initialised). Shows T, RH, DP, status register (heater
+  flagged), counters and the raw T/RH ticks; serial prints the raw ticks too. `SENSORS 2` keeps the A/B page.
+
 ## BENCH 1.3 fix 2 — 2026-10-26
 First run on the bench: display OK, but ~60 % failed SHT reads and sensor A at 67 °C / 17.6 % (valid CRC).
 ### Fixed / added (`12_disp170_sht31`)
