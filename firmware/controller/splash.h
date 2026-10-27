@@ -38,7 +38,9 @@ class BootSplash {
     scroll(0);                      // a restart in the middle of the crash must not keep its scroll/invert
     tft->invertDisplay(invNormal);
     inverted = false;
-    for (uint8_t i = 0; i < NBANDS; i++) order[i] = i;
+    nb = (H + BAND - 1) / BAND;   // 20 on 240 rows, 15 on 170 (the last one partial)
+    if (nb > MAXBANDS) nb = MAXBANDS;
+    for (uint8_t i = 0; i < nb; i++) order[i] = i;
     at = now;
   }
 
@@ -73,10 +75,12 @@ class BootSplash {
             rog(C_HOT, a, a + 30 < ROG_W ? a + 30 : ROG_W, 0, ROG_H, 0);
             stage++;
           } else {
-            tft->fillRect(W / 2 - 80, ly + ROG_H + 18, 160, 2, C_HOT);
+            bool room = H - ly - ROG_H >= 34;   // 170-row panels: tuck line and text right under the logo
+            int16_t gap = room ? 18 : 2, tgap = room ? 24 : 6;
+            tft->fillRect(W / 2 - 80, ly + ROG_H + gap, 160, 2, C_HOT);
             tft->setTextSize(1);
             tft->setTextColor(C_LG, 0x0000);
-            tft->setCursor(W / 2 - 3 * (8 + strlen(ver)), ly + ROG_H + 24);
+            tft->setCursor(W / 2 - 3 * (8 + strlen(ver)), ly + ROG_H + tgap);
             tft->print(F("PCS  fw "));
             tft->print(ver);
             next(ROG_HOLD, now);
@@ -100,7 +104,7 @@ class BootSplash {
 
  private:
   enum Step : uint8_t { BG, SPRITE, ANIM, GLITCH, SWEEP, ROG_HOLD, CLEAR, DONE };
-  static const uint8_t BAND = 12, NBANDS = 20;   // 20 x 12 rows = 240
+  static const uint8_t BAND = 12, MAXBANDS = 20;   // 20 x 12 rows = 240
   Adafruit_ST7789 *tft;
   const SplashSprite *sp;
   const char *ver;
@@ -111,7 +115,8 @@ class BootSplash {
   Step step = DONE;
   uint16_t idx;
   uint8_t ry, stage, done;
-  uint8_t order[NBANDS];   // band resolve order (shuffled); order[0..done) are final
+  uint8_t nb;               // bands on this panel
+  uint8_t order[MAXBANDS];  // band resolve order (shuffled); order[0..done) are final
   bool corrupt;            // blit with wrong colours
   uint32_t at;
 
@@ -179,7 +184,7 @@ class BootSplash {
       next(GLITCH, now);
       inverted = corrupt = false;
       done = 0;
-      for (uint8_t i = NBANDS - 1; i > 0; i--) {   // shuffle the band order
+      for (uint8_t i = nb - 1; i > 0; i--) {   // shuffle the band order
         uint8_t j = random(i + 1), t = order[i];
         order[i] = order[j];
         order[j] = t;
@@ -230,14 +235,14 @@ class BootSplash {
 
   // Band b to its final ROG content: black, with the logo rows in white.
   void resolve(uint8_t b) {
-    int16_t y0 = b * BAND;
+    int16_t y0 = b * BAND, bh = H - y0 < BAND ? H - y0 : BAND;
     uint16_t r0, rows;
-    if (!logoRows(y0, BAND, r0, rows)) {
-      tft->fillRect(0, y0, W, BAND, C_BLK);
+    if (!logoRows(y0, bh, r0, rows)) {
+      tft->fillRect(0, y0, W, bh, C_BLK);
       return;
     }
     if ((int16_t)(ly + r0) > y0) tft->fillRect(0, y0, W, ly + r0 - y0, C_BLK);
-    if (ly + r0 + rows < y0 + BAND) tft->fillRect(0, ly + r0 + rows, W, y0 + BAND - ly - r0 - rows, C_BLK);
+    if (ly + r0 + rows < y0 + bh) tft->fillRect(0, ly + r0 + rows, W, y0 + bh - ly - r0 - rows, C_BLK);
     tft->fillRect(0, ly + r0, lx, rows, C_BLK);
     tft->fillRect(lx + ROG_W, ly + r0, W - lx - ROG_W, rows, C_BLK);
     rog(C_WHT, 0, ROG_W, r0, rows, 0);
@@ -246,7 +251,8 @@ class BootSplash {
   // Scanline noise inside band b (only bands not yet final, so nothing has to be cleaned up later).
   void noise(uint8_t b) {
     static const uint16_t NOISE[4] = {C_HOT, C_WHT, C_DG, 0xF81F};
-    int16_t y = b * BAND + random(BAND - 2), x = random(W / 2), w = 30 + random(W);
+    int16_t y0 = b * BAND, bh = H - y0 < BAND ? H - y0 : BAND;
+    int16_t y = y0 + random(bh > 2 ? bh - 2 : 1), x = random(W / 2), w = 30 + random(W);
     if (x + w > W) w = W - x;
     tft->fillRect(x, y, w, 1 + random(2), NOISE[random(4)]);
   }
@@ -260,26 +266,26 @@ class BootSplash {
       scroll(f == 2 ? 0 : (random(2) ? 1 : -1) * (20 + random(60)));
       tear(f != 1);
       if (f) tear(random(2));
-      noise(random(NBANDS));
+      noise(random(nb));
       if (f == 0 || f == 4) flash(true);
       return;
     }
-    if (done >= NBANDS) {         // all bands final: picture back in place
+    if (done >= nb) {         // all bands final: picture back in place
       scroll(0);
       flash(false);
       next(SWEEP, now);
       return;
     }
     // phase 2: two bands land on their final content, a ghost of the logo flickers in one that hasn't
-    uint8_t left = NBANDS - done;
+    uint8_t left = nb - done;
     scroll(left > 4 ? random(-3 * left, 3 * left + 1) : 0);
-    for (uint8_t k = 0; k < 2 && done < NBANDS; k++) resolve(order[done++]);
-    if (done < NBANDS) {
-      uint8_t b = order[done + random(NBANDS - done)];
+    for (uint8_t k = 0; k < 2 && done < nb; k++) resolve(order[done++]);
+    if (done < nb) {
+      uint8_t b = order[done + random(nb - done)];
       uint16_t r0, rows;
       if (logoRows(b * BAND, BAND, r0, rows))
         rog(random(4) ? C_WHT : C_HOT, 0, ROG_W, r0, rows, random(-4 * left, 4 * left + 1));
-      noise(order[done + random(NBANDS - done)]);
+      noise(order[done + random(nb - done)]);
     }
     if (f == 9) flash(true);
   }

@@ -6,7 +6,11 @@
 #define ST77XX_BLACK 0x0000
 class Adafruit_ST7789 {
  public:
-  static const int FW = 280, FH = 240;
+#ifndef FB_W
+#define FB_W 280
+#define FB_H 240
+#endif
+  static const int FW = FB_W, FH = FB_H;   // -DFB_W=320 -DFB_H=170 for the 1.9" (lite170)
   uint16_t fb[FH][FW];
   bool inv = false;
   long windows = 0;
@@ -72,7 +76,7 @@ class Adafruit_ST7789 {
   void savePPM(const char *path) {
     FILE *f = fopen(path, "wb"); fprintf(f, "P6 %d %d 255\n", FW, FH);
     for (int y = 0; y < FH; y++) for (int x = 0; x < FW; x++) {
-      int row = (x + 20 + scr) % 320 - 20;
+      int off = (320 - FW) / 2, row = (x + off + scr) % 320 - off;
       uint16_t c = row >= 0 && row < FW ? fb[y][row] : (uint16_t)((row * 7919 + y * 104729) * 2654435761u >> 7); if (inv) c = ~c; fputc((c >> 11) << 3, f); fputc(((c >> 5) & 63) << 2, f); fputc((c & 31) << 3, f); }
     fclose(f);
   }

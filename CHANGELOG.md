@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-27 | 0.4.6 + lite 1.0 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.6` |
 | 2026-10-27 | 0.4.5 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.5` |
 | 2026-10-26 | — | — | 1.4 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-26 | — | — | 1.3 | 2 | 4b + CS mod + SHT30 | rev11 | — |
@@ -26,6 +27,22 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.6 + lite170 1.0 — 2026-10-27
+Host syntax check (controller, lite170, 11_ui_dev); host render of the lite boot and all three 320x170 screens with
+full controller data, a fault and the lite data (`docs/display/preview170_*.png`). Not yet compiled for AVR.
+
+### Added
+- `firmware/lite170`: lite case display for the 1.9" (320x170, 4 MHz) with the two SHT31s wired in permanently.
+  Boot Pingu → crash → ROG, then Mode 1/2/3 screens re-laid out for 320x170 (`screens170.*`, class `Screens170`).
+  Live case T / RH / dew point (highest valid of A/B; 3 bad reads invalidate, first good read validates at boot),
+  everything else "--"; NO DEW POINT banner if neither sensor is valid. Buttons and LED as the controller, mode
+  and splash bytes in EEPROM 0..3 shared with it. Serial line per read.
+- `tools/ui_preview`: framebuffer size per build (`-DFB_W/-DFB_H`), `preview170.cpp`.
+
+### Changed (FW, no visible change on the 1.69")
+- `splash.h` works on any panel height: band count from H (15 on 170 rows, last band partial), underline and
+  version tucked under the logo when there is no room for the usual gap.
 
 ## FW 0.4.5 + HW note — 2026-10-27
 Host syntax check. Bench: 1.5 m C4 cable with the new dividers works up to 6 MHz.
