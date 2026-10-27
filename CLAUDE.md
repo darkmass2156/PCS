@@ -105,8 +105,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | D28 | SEN | V1 enable |
 | D30 / D32 | BTN1 / BTN2 | 10k pull-up, 1k + 100 nF RC, active LOW |
 | D34 / D36 | SDA2 / SCL2 | SHT30, software I2C (module pull-ups + internal pull-ups) |
-| D49 | DISP_CS | ST7789 CS via 1k/2k divider, Mega ribbon pin 32 |
-| D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 1k/2k dividers; D50 unused |
+| D49 | DISP_CS | ST7789 CS via 330/660 Ω divider, Mega ribbon pin 32 |
+| D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 330/660 Ω dividers; D50 unused |
 | 3.3V pin | display 3V3 | powers the ST7789, backlight included |
 
 ## Connectors (for bench wiring)
@@ -126,7 +126,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - C5 3P: T1 NTC (NTC, GND, spare) — rerouted from the GPU block to the loop return
   - C6: USB to the Mega (no GX12)
 - **Board 2 display CS mod** (on top of rev 4b):
-  - R22 1k at L7–P7, R23 2k at Q7–U7.
+  - R22 330 Ω at L7–P7, R23 660 Ω at Q7–U7 (originally 1k/2k; all display dividers changed 2026-10-27,
+    see `docs/changes/display_dividers.md`).
   - Bridges P7–Q7 and U7–V7.
   - Wires: S2 (Mega ribbon pin 32) > L7, and P7 > A20.
   - The DISP header becomes A15–A20, with A20 = CS.
@@ -165,8 +166,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - image shifted by 20 rows → apply the 20-row offset manually (normally `init(240, 280)` handles it)
   Remaining risks: no reset pin, 5V resistor-divider level shifting, and a ~1.5 m cable.
 - **Wiring**: CS = 49 (through the divider), RST = -1 (10k + 100 nF power-on RC at the display), default SPI mode.
-- **SPI clock**: ≤ 2 MHz. `init()` itself runs at the library default, so the firmware sets 2 MHz and then
-  re-sends the init sequence (SWRESET → SLPOUT → COLMOD → NORON → DISPON) at 2 MHz.
+- **SPI clock**: 4 MHz (`DISP_SPI_HZ`). The finished 1.5 m C4 cable with the 330/660 Ω dividers worked up to
+  6 MHz on the bench (2026-10-27); 4 MHz keeps margin. `init()` itself runs at the library default, so the firmware
+  sets `DISP_SPI_HZ` and then re-sends the init sequence (SWRESET → SLPOUT → COLMOD → NORON → DISPON) at it.
 - **D53** stays OUTPUT (DC, and SPI master needs it). **D50** is MISO, unusable as output.
 - **Backlight** is tied to VCC, so it's always on with no dimming.
 - **Redraw**: values are collected once per second into `UiData` (`scr_data.h`, filled by `display.cpp`);
@@ -370,7 +372,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 5. **K_POT**: later, on the real loop.
 
 ## Tunables (`config.h`)
-- Display: `DISPLAY_VARIANT` = 1, `DISP_SPI_HZ` = 2 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
+- Display: `DISPLAY_VARIANT` = 1, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
   `BOOT_SPLASH` = 1
 - Setpoint and margins:
   - `MARGIN_DP_C` = 4.0, `DELTA_ROOM_C` (δ) = 3.0 (TBD, bench check 1), `MODE2_FALLBACK_C` = 20.0

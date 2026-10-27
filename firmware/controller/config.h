@@ -29,7 +29,7 @@
 
 // ---------------- Display ----------------
 #define DISPLAY_VARIANT 1          // 1 = MSP1691 (280x240 landscape); 2 = MSP1901 has no layouts since display rev 3
-#define DISP_SPI_HZ     2000000UL
+#define DISP_SPI_HZ     4000000UL
 // Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
 // MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
 // The banner prints which one a build is for. Set back to 0 before flashing the real controller.

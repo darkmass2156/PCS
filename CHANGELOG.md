@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-27 | 0.4.5 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.5` |
 | 2026-10-26 | — | — | 1.4 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-26 | — | — | 1.3 | 2 | 4b + CS mod + SHT30 | rev11 | — |
 | 2026-10-17 | 0.4.4 | 6 | 1.2 | 2 | 4b + CS mod + SHT30 | rev11 | `fw-v0.4.4` |
@@ -25,6 +26,14 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.5 + HW note — 2026-10-27
+Host syntax check. Bench: 1.5 m C4 cable with the new dividers works up to 6 MHz.
+
+### Changed
+- HW: display dividers 1k/2k → 330/660 Ω (change note `docs/changes/display_dividers.md`). With 1k/2k the panel
+  stayed black on the finished cable, also at 1 MHz.
+- `DISP_SPI_HZ` 2 → 4 MHz; `06_display`, `11_ui_dev`, `12_disp170_sht31` follow.
 
 ## BENCH 1.4 — 2026-10-26
 Host syntax check (both sensor modes) and a host run of the log: 600 samples with a reset and a B dropout,

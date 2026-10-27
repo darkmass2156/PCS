@@ -28,7 +28,7 @@ static UiData ui;
 static bool uiReady;
 static uint32_t lastValuesAt, lastReinitAt;
 
-// ---------------- init sequence (2 MHz) ----------------
+// ---------------- init sequence (at DISP_SPI_HZ) ----------------
 // SWRESET keeps GRAM, so the periodic re-init doesn't blank the screen.
 struct InitStep { uint8_t cmd; uint8_t arg; bool hasArg; uint8_t waitMs; };
 static const InitStep initSeq[] = {
@@ -92,7 +92,7 @@ static uint8_t pickSplash() {
 
 void displayInit() {
   tft.init(INIT_W, INIT_H);         // runs at the library default clock ...
-  tft.setSPISpeed(DISP_SPI_HZ);     // ... so redo it at 2 MHz for the long cable
+  tft.setSPISpeed(DISP_SPI_HZ);     // ... so redo it at DISP_SPI_HZ (4 MHz) for the long cable
   for (uint8_t i = 0; i < INIT_STEPS; i++) {
     sendStep(i);
     delay(initSeq[i].waitMs);

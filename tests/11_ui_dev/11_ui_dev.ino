@@ -80,7 +80,7 @@ void applyOrientation() {   // mirrors display.cpp
 void initPanel() {
   uint8_t colmod = 0x55;
   tft.init(240, 280);
-  tft.setSPISpeed(2000000);
+  tft.setSPISpeed(4000000);   // as DISP_SPI_HZ: 1.5 m C4 cable, tested OK up to 6 MHz
   tft.sendCommand(ST77XX_SWRESET); delay(150);
   tft.sendCommand(ST77XX_SLPOUT);  delay(120);
   tft.sendCommand(ST77XX_COLMOD, &colmod, 1); delay(10);

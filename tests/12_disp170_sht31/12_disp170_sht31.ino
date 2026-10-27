@@ -374,7 +374,7 @@ void applyOrientation() {   // as display.cpp: rotation, then MADCTL with BGR, t
 void initPanel() {
   uint8_t colmod = 0x55;
   tft.init(170, 320, spiMode);  // native portrait size; the library sets the 35-column offset (and pulses RES)
-  tft.setSPISpeed(2000000);     // long cable: redo the init sequence at 2 MHz
+  tft.setSPISpeed(4000000);     // 1.5 m cable: OK up to 6 MHz, 4 MHz used; init sequence redone at this speed
   tft.sendCommand(ST77XX_SWRESET); delay(150);
   tft.sendCommand(ST77XX_SLPOUT);  delay(120);
   tft.sendCommand(ST77XX_COLMOD, &colmod, 1); delay(10);

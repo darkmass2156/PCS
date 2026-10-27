@@ -1,4 +1,4 @@
-// 06_display — ST7789 at 2 MHz, CS D49, DC D53, RST -1 (power-on RC), via the C4 cable.
+// 06_display — ST7789 at 4 MHz, CS D49, DC D53, RST -1 (power-on RC), via the C4 cable.
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
 // Set DISPLAY_VARIANT to the panel fitted, upload, check:
 //   - a 1 px white frame touches all four edges (offset OK; if shifted ~20 rows, report it)
@@ -6,7 +6,7 @@
 //   - background black, text white (else 'i' toggles invert)
 //   - the counter ticks every second for 10+ minutes, including after 'x' (re-init without clear)
 // Buttons: BTN1 short = invert, BTN2 short = BGR, BTN1 long = re-init (no clear), BTN2 long = full redraw.
-// Serial: i invert, b BGR, x re-init (2 MHz sequence, no clear), f full redraw.
+// Serial: i invert, b BGR, x re-init (4 MHz sequence, no clear), f full redraw.
 // For layout work use tests/11_ui_dev; this sketch only proves the panel, cable and colours.
 
 #include <SPI.h>
@@ -65,7 +65,7 @@ void setup() {
   benchButtonsBegin();
   uint32_t t0 = millis();
   tft.init(IW, IH);
-  tft.setSPISpeed(2000000);
+  tft.setSPISpeed(4000000);   // as DISP_SPI_HZ
   initSeq();
   drawPattern();
   Serial.print(F("init + pattern ms ")); Serial.println(millis() - t0);
