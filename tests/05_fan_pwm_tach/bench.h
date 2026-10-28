@@ -4,7 +4,7 @@
 // After editing this file run:  for d in tests/[0-9]*/; do cp tests/common/bench.h "$d"; done
 #include <Arduino.h>
 
-#define BENCH_VERSION "1.4"
+#define BENCH_VERSION "1.5"
 
 // Safety rule 1 for every sketch: all switched outputs LOW before anything else.
 inline void benchOutputsLow() {

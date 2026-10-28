@@ -80,6 +80,7 @@ float dpFrom(uint8_t addr) {
   for (uint8_t i = 0; i < 6; i++) b[i] = Wire.read();
   float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
   float rh = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
+  rh = constrain(rh + (addr == 0x44 ? 0.75f : -0.75f), 0.0f, 100.0f);   // RH calibration, as config.h SHT_RH_OFFSET_A/B
   if (rh < 1) return NAN;
   float g = log(rh / 100.0f) + 17.62f * t / (243.12f + t);
   return 243.12f * g / (17.62f - g);

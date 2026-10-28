@@ -22,7 +22,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.0"
+#define LITE_VERSION "lite 1.1"
 #define TFT_RST 48          // RES wire to D48 (bench / Vlad's cable), -1 if RES only has the RC at the display
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -30,6 +30,8 @@
 #define DISP_ROTATION 1     // 3 = landscape upside down
 #define BOOT_SPLASH 1
 #define DISP_REINIT_MS 300000UL
+#define SHT_RH_OFFSET_A  0.75f  // RH calibration (% RH, as config.h): A 0x44 read low
+#define SHT_RH_OFFSET_B -0.75f  // B 0x45 read high
 const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);
@@ -42,11 +44,12 @@ uint8_t mode = 1;
 struct Sht {
   const char *name;
   uint8_t addr;
+  float rhOfs;            // calibration offset, % RH
   bool valid;             // after 3 good reads; lost after 3 bad ones (as the firmware)
   uint8_t bad, good;
   float t, rh, dp;
 };
-Sht sht[2] = {{"A", 0x44, false, 0, 2}, {"B", 0x45, false, 0, 2}};   // good = 2: the first good read validates at boot
+Sht sht[2] = {{"A", 0x44, SHT_RH_OFFSET_A, false, 0, 2}, {"B", 0x45, SHT_RH_OFFSET_B, false, 0, 2}};   // good = 2: the first good read validates at boot
 
 uint8_t crc8(const uint8_t *d, uint8_t n) {
   uint8_t crc = 0xFF;
@@ -82,7 +85,7 @@ void fetch(Sht &s, bool trig) {
   float t = 0, rh = 0;
   if (ok) {
     t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
-    rh = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
+    rh = constrain(100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f + s.rhOfs, 0.0f, 100.0f);
     ok = t > -40 && t < 85 && rh > 0.5f && rh <= 100;   // plausible
   }
   if (ok) {

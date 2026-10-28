@@ -102,7 +102,8 @@ static void shtResult(uint8_t i, bool ok, const uint8_t *d) {
   if (ok) ok = crc8(d, 2) == d[2] && crc8(d + 3, 2) == d[5];
   if (ok) {
     float t = -45.0f + 175.0f * (uint16_t)((d[0] << 8) | d[1]) / 65535.0f;
-    float rh = 100.0f * (uint16_t)((d[3] << 8) | d[4]) / 65535.0f;
+    static const float RH_OFS[SHT_COUNT] = {SHT_RH_OFFSET_A, SHT_RH_OFFSET_B, SHT_RH_OFFSET_R};
+    float rh = constrain(100.0f * (uint16_t)((d[3] << 8) | d[4]) / 65535.0f + RH_OFS[i], 0.0f, 100.0f);
     ok = t > -20.0f && t < 70.0f && rh > 0.5f && rh <= 100.0f;
     if (ok) {
       s.t = t;

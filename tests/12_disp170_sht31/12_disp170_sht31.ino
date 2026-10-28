@@ -47,6 +47,8 @@
 #define SENSORS 2           // 1 = one sensor, 2 = A and B
 #define LOG_INTERVAL_S 60   // night log: seconds per sample (1016 samples: 60 s = 16.9 h, 90 s = 25 h)
 #define SINGLE_ADDR 0x44    // SENSORS 1: address at boot (0x44 ADDR to GND, 0x45 ADDR to VIN)
+#define SHT_RH_OFFSET_A  0.75f  // RH calibration (% RH, as config.h): 0x44 read low, 0x45 high. Raw ticks stay raw.
+#define SHT_RH_OFFSET_B -0.75f
 #define TFT_RST 48          // pin wired to the module's RES (via divider), or -1
 #define ROTATION 1          // 3 = landscape upside down
 const uint16_t W = 320, H = 170;
@@ -134,7 +136,7 @@ void fetch(Sht &s) {
   s.rawT = (b[0] << 8) | b[1];
   s.rawRH = (b[3] << 8) | b[4];
   s.t = -45.0f + 175.0f * s.rawT / 65535.0f;   // datasheet conversion
-  s.rh = 100.0f * s.rawRH / 65535.0f;
+  s.rh = constrain(100.0f * s.rawRH / 65535.0f + (s.addr == 0x44 ? SHT_RH_OFFSET_A : SHT_RH_OFFSET_B), 0.0f, 100.0f);
   s.dp = dewPoint(s.t, s.rh);
   s.ok = true;
   s.good++;

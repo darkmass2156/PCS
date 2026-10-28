@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-28 | 0.4.7 + lite 1.1 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.7` |
 | 2026-10-27 | 0.4.6 + lite 1.0 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.6` |
 | 2026-10-27 | 0.4.5 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.5` |
 | 2026-10-26 | — | — | 1.4 | 2 | 4b + CS mod + SHT30 | rev11 | — |
@@ -27,6 +28,15 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.7, lite170 1.1, BENCH 1.5 — 2026-10-28
+Host syntax check of every changed sketch. Not yet compiled for AVR.
+
+### Changed
+- SHT RH calibration from Vlad's side-by-side run: A 0x44 +0.75 % RH, B 0x45 −0.75 % RH (R unchanged), added
+  to the reading and clamped to 0…100 before the dew point. Firmware (`SHT_RH_OFFSET_A/B/R` in `config.h`),
+  lite170, `02_sht31_dewpoint`, `10_v2_calibration`, `12_disp170_sht31` (raw ticks stay raw; the night log stores
+  corrected RH).
 
 ## FW 0.4.6 + lite170 1.0 — 2026-10-27
 Host syntax check (controller, lite170, 11_ui_dev); host render of the lite boot and all three 320x170 screens with
