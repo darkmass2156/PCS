@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-28 | 0.4.8 + lite 1.2 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.8` |
 | 2026-10-28 | 0.4.7 + lite 1.1 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.7` |
 | 2026-10-27 | 0.4.6 + lite 1.0 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.6` |
 | 2026-10-27 | 0.4.5 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.5` |
@@ -28,6 +29,20 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.8, lite170 1.2 — 2026-10-28
+**First real AVR build** of everything: avr-gcc 7.3.0 (same as the IDE), ArduinoCore-avr 1.8.8, Adafruit ST7735/ST7789
+1.12.0, GFX 1.13.0, BusIO 1.17.4. All 15 sketches compile and link with `-Wall -Wextra`, 0 warnings after the fixes
+below. Flash / RAM: controller 70.4 KB (26.9 %) / 2.9 KB (35.8 %), lite170 60.1 KB / 2.7 KB, 11_ui_dev 56.0 KB / 2.3 KB,
+12_disp170_sht31 39.2 KB / 1.4 KB, tests 00–10 ≤ 15.2 KB / 0.6 KB.
+
+### Added
+- `tools/avr_build/build.sh` (`all` or one sketch dir): IDE-equivalent Mega 2560 build, flash/RAM report.
+
+### Fixed (no behaviour change)
+- `splash.h`: three comparisons mixed `int16_t` with `uint16_t`; on AVR (16-bit `int`) those compare unsigned.
+  The values involved are never negative, so the result was right, but they are now explicitly signed.
+- `screens.cpp`: unused `seg5()` removed (left over from the segment digits in Mode 2).
 
 ## FW 0.4.7, lite170 1.1, BENCH 1.5 — 2026-10-28
 Host syntax check of every changed sketch. Not yet compiled for AVR.

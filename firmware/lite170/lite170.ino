@@ -22,7 +22,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.1"
+#define LITE_VERSION "lite 1.2"
 #define TFT_RST 48          // RES wire to D48 (bench / Vlad's cable), -1 if RES only has the RC at the display
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -49,7 +49,7 @@ struct Sht {
   uint8_t bad, good;
   float t, rh, dp;
 };
-Sht sht[2] = {{"A", 0x44, SHT_RH_OFFSET_A, false, 0, 2}, {"B", 0x45, SHT_RH_OFFSET_B, false, 0, 2}};   // good = 2: the first good read validates at boot
+Sht sht[2] = {{"A", 0x44, SHT_RH_OFFSET_A, false, 0, 2, 0, 0, 0}, {"B", 0x45, SHT_RH_OFFSET_B, false, 0, 2, 0, 0, 0}};   // good = 2: the first good read validates at boot
 
 uint8_t crc8(const uint8_t *d, uint8_t n) {
   uint8_t crc = 0xFF;

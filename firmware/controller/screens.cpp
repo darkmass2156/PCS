@@ -24,17 +24,6 @@ static uint32_t key(uint32_t h) { return h | 1; }   // 0 = "not drawn yet"
 
 static int16_t clampi(long v, long lo, long hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-// "%5.1f"-style fixed cells for the segment digits: " 12.3", "-25.5", " --.-"
-static char *seg5(char *out, float v) {
-  if (isnan(v)) strcpy(out, " --.-");
-  else {
-    if (v > 99.9f) v = 99.9f;
-    if (v < -99.9f) v = -99.9f;
-    dtostrf(v, 5, 1, out);
-  }
-  return out;
-}
-
 // "25.1\xF8C", "42.1%" (cp437 248 = degree sign)
 static char *degC(char *out, float v) {
   char t[10];

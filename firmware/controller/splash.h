@@ -214,7 +214,7 @@ class BootSplash {
     if (r0 + n > sp->h) n = sp->h - r0;
     int16_t dx = random(-30, 31), ox = sx + dx, wpx = sp->w * S;
     if (ox < 0) ox = 0;
-    if (ox + wpx > W) ox = W - wpx;
+    if (ox + wpx > (int16_t)W) ox = W - wpx;
     if (ox > sx) tft->fillRect(sx, sy + r0 * S, ox - sx, n * S, sp->bg);                 // uncovered gap
     if (ox < sx) tft->fillRect(ox + wpx, sy + r0 * S, sx - ox, n * S, sp->bg);
     corrupt = bad;
@@ -242,7 +242,7 @@ class BootSplash {
       return;
     }
     if ((int16_t)(ly + r0) > y0) tft->fillRect(0, y0, W, ly + r0 - y0, C_BLK);
-    if (ly + r0 + rows < y0 + bh) tft->fillRect(0, ly + r0 + rows, W, y0 + bh - ly - r0 - rows, C_BLK);
+    if (ly + (int16_t)(r0 + rows) < y0 + bh) tft->fillRect(0, ly + r0 + rows, W, y0 + bh - ly - r0 - rows, C_BLK);
     tft->fillRect(0, ly + r0, lx, rows, C_BLK);
     tft->fillRect(lx + ROG_W, ly + r0, W - lx - ROG_W, rows, C_BLK);
     rog(C_WHT, 0, ROG_W, r0, rows, 0);
@@ -253,7 +253,7 @@ class BootSplash {
     static const uint16_t NOISE[4] = {C_HOT, C_WHT, C_DG, 0xF81F};
     int16_t y0 = b * BAND, bh = H - y0 < BAND ? H - y0 : BAND;
     int16_t y = y0 + random(bh > 2 ? bh - 2 : 1), x = random(W / 2), w = 30 + random(W);
-    if (x + w > W) w = W - x;
+    if (x + w > (int16_t)W) w = W - x;
     tft->fillRect(x, y, w, 1 + random(2), NOISE[random(4)]);
   }
 

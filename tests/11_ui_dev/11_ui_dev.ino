@@ -141,7 +141,7 @@ void loop() {
     uint32_t t = millis();
     while (!Serial.available() && millis() - t < 500) {}
     char k = Serial.read();
-    if (k >= '0' && k < '0' + SPLASH_COUNT) { penguin = k - '0'; boot(); }
+    if (k >= '0' && k < (char)('0' + SPLASH_COUNT)) { penguin = k - '0'; boot(); }
   }
   if (c == '?') help();
   if (c == 'm' || (c >= '1' && c <= '3')) { d.mode = mode; Serial.print(F("mode ")); Serial.println(mode); }
