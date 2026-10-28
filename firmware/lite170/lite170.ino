@@ -22,7 +22,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.2"
+#define LITE_VERSION "lite 1.3"
 #define TFT_RST 48          // RES wire to D48 (bench / Vlad's cable), -1 if RES only has the RC at the display
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -30,8 +30,8 @@
 #define DISP_ROTATION 1     // 3 = landscape upside down
 #define BOOT_SPLASH 1
 #define DISP_REINIT_MS 300000UL
-#define SHT_RH_OFFSET_A  0.75f  // RH calibration (% RH, as config.h): A 0x44 read low
-#define SHT_RH_OFFSET_B -0.75f  // B 0x45 read high
+#define SHT_RH_OFFSET_A  1.15f  // RH calibration (% RH, as config.h): A 0x44 read low
+#define SHT_RH_OFFSET_B -1.15f  // B 0x45 read high
 const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);

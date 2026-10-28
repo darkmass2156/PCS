@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-10-28 | 0.4.9 + lite 1.3 | 6 | 1.6 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.9` |
 | 2026-10-28 | 0.4.8 + lite 1.2 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.8` |
 | 2026-10-28 | 0.4.7 + lite 1.1 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.7` |
 | 2026-10-27 | 0.4.6 + lite 1.0 | 6 | 1.4 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.6` |
@@ -29,6 +30,14 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.4.9, lite170 1.3, BENCH 1.6 — 2026-10-28
+AVR build of all sketches (`tools/avr_build/build.sh all`): OK, 0 warnings.
+
+### Changed
+- SHT RH calibration raised to A 0x44 **+1.15 % RH**, B 0x45 **−1.15 % RH** (was ±0.75), everywhere the offsets
+  live: `config.h`, lite170, `02_sht31_dewpoint`, `10_v2_calibration`, `12_disp170_sht31`. Displayed RH, dew points,
+  the night log and the control logic all use the corrected values.
 
 ## FW 0.4.8, lite170 1.2 — 2026-10-28
 **First real AVR build** of everything: avr-gcc 7.3.0 (same as the IDE), ArduinoCore-avr 1.8.8, Adafruit ST7735/ST7789

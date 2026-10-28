@@ -17,7 +17,7 @@ SoftI2C bus2(34, 36);
 
 // RH calibration offsets (% RH, as config.h SHT_RH_OFFSET_*): A read low, B high. Set 0 to see raw readings.
 struct Dev { const char *name; uint8_t addr; bool soft; float rhOfs; uint16_t nack, crc; };
-Dev devs[3] = {{"A 0x44", 0x44, false, 0.75f, 0, 0}, {"B 0x45", 0x45, false, -0.75f, 0, 0}, {"R soft", 0x44, true, 0.0f, 0, 0}};
+Dev devs[3] = {{"A 0x44", 0x44, false, 1.15f, 0, 0}, {"B 0x45", 0x45, false, -1.15f, 0, 0}, {"R soft", 0x44, true, 0.0f, 0, 0}};
 uint16_t periodMs = 2000;
 
 uint8_t crc8(const uint8_t *d, uint8_t n) {

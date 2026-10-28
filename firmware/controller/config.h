@@ -126,8 +126,8 @@
 #define SHT_GOOD_LIMIT  3
 // RH calibration offsets, added to the reading (% RH), corrected RH clamped to 0..100.
 // A/B from a side-by-side run (2026-10-28): A read low, B high.
-#define SHT_RH_OFFSET_A  0.75f   // SHT31 A 0x44
-#define SHT_RH_OFFSET_B -0.75f   // SHT31 B 0x45
+#define SHT_RH_OFFSET_A  1.15f   // SHT31 A 0x44
+#define SHT_RH_OFFSET_B -1.15f   // SHT31 B 0x45
 #define SHT_RH_OFFSET_R  0.0f    // SHT30 room
 
 // ---------------- Misc ----------------
