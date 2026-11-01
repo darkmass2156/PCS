@@ -115,7 +115,6 @@ static Rgb ledFor(uint32_t now) {
   }
   if (st.state == ST_NO12V) return C_OFF;
   if (st.state == ST_SAFE) return (now / 125) % 2 ? C_RED : C_OFF;          // 4 Hz, unlike Mode 3's slow red
-  if (st.alarms && now % 2000 < 100) return C_YELLOW;
   const Rgb &c = st.mode == MODE_OFF ? C_WHITE : st.mode == MODE_LOADCAP ? C_BLUE : C_RED;
   return scale(c, breath(now));
 }

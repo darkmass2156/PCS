@@ -22,7 +22,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.4"
+#define LITE_VERSION "lite 1.5"
 #define TFT_RST 47          // rev 6b: RES on D47 through C5 pin 3 (680 Ω to GND on LG, so -1 = black screen)
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -236,10 +236,6 @@ void ledUpdate(uint32_t now) {
   }
   if (ui.faults) {   // no SHT31 valid
     benchLed((now / 125) % 2 ? 255 : 0, 0, 0);
-    return;
-  }
-  if (ui.alarms && now % 2000 < 100) {
-    benchLed(200, 120, 0);
     return;
   }
   uint8_t k = breath(now);

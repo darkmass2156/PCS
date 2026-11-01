@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-01 | 0.5.4 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.4` |
 | 2026-11-01 | 0.5.3 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.3` |
 | 2026-11-01 | 0.5.2 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.2` |
 | 2026-11-01 | 0.5.1 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.1` |
@@ -37,6 +38,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.5.4 + lite 1.5 — 2026-11-01
+- Status LED (scheme 1): the alarm flash (100 ms yellow every 2 s) is removed (Vlad). Alarms show on the display
+  and as `#` serial lines; the LED shows mode, fault and the mode-change pulses only.
 ## BENCH — 2026-11-01: `14_led_colors`
 - New sketch to map the status LED colours on the buttons: firmware colours with per-channel gains, raw mixer,
   white balance (prints `LED_GAIN_*` lines), hue sweep. Bench: green and blue very dim, white shows purple.
