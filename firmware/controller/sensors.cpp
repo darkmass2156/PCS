@@ -54,6 +54,7 @@ static void ntcUpdate(uint32_t now) {
     if (!isnan(c) && !NTC_TRIMPOT_SIM) c += ch.offset;
     NtcReading &o = *ch.out;
     o.c = c;
+    o.adc = ch.adcF;
     o.inRange = !isnan(c) && c >= NTC_MIN_C && c <= NTC_MAX_C;
     if (o.inRange) ch.bad.clear();
     else ch.bad.hold(now);

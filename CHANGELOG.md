@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-01 | 0.5.1 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.1` |
 | 2026-11-01 | 0.5.0 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.0` |
 | 2026-10-28 | 0.4.9 + lite 1.3 | 6 | 1.6 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.9` |
 | 2026-10-28 | 0.4.8 + lite 1.2 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.8` |
@@ -31,6 +32,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.5.1 — 2026-11-01
+AVR build OK, 0 warnings.
+### Added
+- `?` prints each NTC as the ADC sees it: filtered counts, resistance (10k pull-up), °C, valid — to chase a wrong
+  T1 (A5) reading. `NtcReading.adc` added.
 
 ## DOC — 2026-11-01
 - `docs/controller_pinout_rev6b.md` (Vlad): component → LG → ribbon → housing H1–H8 → Mega for every wire.

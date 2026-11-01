@@ -164,6 +164,16 @@ static void printStatus() {
   Serial.print(' '); Serial.print(sht[SHT_B].errCount);
   Serial.print(' '); Serial.print(sht[SHT_R].errCount);
   Serial.print(F(" I2C recoveries ")); Serial.println(i2cRecoveries);
+  // NTC inputs as the ADC sees them: counts, resistance (10k pull-up), temperature
+  const NtcReading *n[3] = {&ntcT1, &ntcT2, &ntcT3};
+  const char *const NAME[3] = {"T1 A5", "T2 A4", "T3 A3"};
+  for (uint8_t i = 0; i < 3; i++) {
+    Serial.print(F("# NTC ")); Serial.print(NAME[i]);
+    Serial.print(F(": adc ")); Serial.print(n[i]->adc, 1);
+    Serial.print(F(" = ")); Serial.print(n[i]->adc < 1022.5f ? NTC_R_PULLUP * n[i]->adc / (1023.0f - n[i]->adc) : 1e9f, 0);
+    Serial.print(F(" ohm -> ")); Serial.print(n[i]->c, 2);
+    Serial.println(n[i]->valid ? F(" C") : F(" C (invalid)"));
+  }
 }
 
 void setup() {
