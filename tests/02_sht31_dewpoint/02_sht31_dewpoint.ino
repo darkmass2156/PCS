@@ -88,7 +88,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
   Wire.setClock(50000);
-  Wire.setWireTimeout(5000, true);
+  Wire.setWireTimeout(25000, true);   // as the firmware (rev 6b)
   bus2.begin();
   benchBanner(F("02_sht31_dewpoint"));
   Serial.println(F("BTN1 short: reset counters | BTN2 short: 2 s / 0.5 s | BTN1 long: breath marker"));

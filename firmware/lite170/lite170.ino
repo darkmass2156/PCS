@@ -22,8 +22,8 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.3"
-#define TFT_RST 48          // RES wire to D48 (bench / Vlad's cable), -1 if RES only has the RC at the display
+#define LITE_VERSION "lite 1.4"
+#define TFT_RST 47          // rev 6b: RES on D47 through C5 pin 3 (680 Ω to GND on LG, so -1 = black screen)
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
 #define DISP_BGR 0
@@ -66,11 +66,38 @@ float dewPoint(float t, float rh) {
   return b * g / (a - g);
 }
 
+void wireStart() {
+  Wire.begin();
+  Wire.setClock(50000);
+  Wire.setWireTimeout(25000, true);   // rev 6b: 25 ms, then the bus is recovered
+}
+
+// After a Wire timeout: 9 SCL pulses so a slave holding SDA low finishes its byte, a STOP, restart Wire.
+bool wireTimedOut() {
+  if (!Wire.getWireTimeoutFlag()) return false;
+  Wire.end();
+  pinMode(SDA, INPUT);
+  for (uint8_t k = 0; k < 9 && digitalRead(SDA) == LOW; k++) {
+    pinMode(SCL, OUTPUT);   // PORT bit is 0: OUTPUT = LOW, INPUT = released to the pull-up
+    delayMicroseconds(10);
+    pinMode(SCL, INPUT);
+    delayMicroseconds(10);
+  }
+  pinMode(SDA, OUTPUT);
+  delayMicroseconds(10);
+  pinMode(SDA, INPUT);
+  wireStart();
+  Wire.clearWireTimeoutFlag();
+  Serial.println(F("# I2C timeout: bus recovered"));
+  return true;
+}
+
 bool command(uint8_t addr, uint16_t cmd) {
   Wire.beginTransmission(addr);
   Wire.write((uint8_t)(cmd >> 8));
   Wire.write((uint8_t)cmd);
-  return Wire.endTransmission() == 0;
+  bool ok = Wire.endTransmission() == 0;
+  return !wireTimedOut() && ok;
 }
 
 bool triggered[2];
@@ -78,6 +105,7 @@ bool triggered[2];
 void fetch(Sht &s, bool trig) {
   uint8_t b[6];
   bool ok = trig && Wire.requestFrom(s.addr, (uint8_t)6) == 6;
+  if (trig && wireTimedOut()) ok = false;
   if (ok) {
     for (uint8_t i = 0; i < 6; i++) b[i] = Wire.read();
     ok = crc8(b, 2) == b[2] && crc8(b + 3, 2) == b[5];
@@ -241,9 +269,7 @@ void setup() {
   help();
   benchButtonsBegin();
   if (EEPROM.read(0) == 0xA5 && EEPROM.read(1) >= 1 && EEPROM.read(1) <= 3) mode = EEPROM.read(1);
-  Wire.begin();
-  Wire.setClock(50000);
-  Wire.setWireTimeout(5000, true);
+  wireStart();
   for (Sht &s : sht) {   // known state: soft reset, heater off, clear status
     command(s.addr, 0x30A2);
     delay(2);

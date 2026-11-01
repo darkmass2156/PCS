@@ -1,5 +1,5 @@
 #pragma once
-// Pin map and tunables. Pin map mirrors CLAUDE.md (authoritative).
+// Pin map and tunables. Pin map mirrors CLAUDE.md (authoritative), hardware rev 6b.
 
 // ---------------- Pins ----------------
 #define PIN_S1        A0   // P2 fuse sense
@@ -24,16 +24,17 @@
 #define PIN_BTN2      32
 #define PIN_SDA2      34   // SHT30 soft I2C
 #define PIN_SCL2      36
+#define PIN_DISP_RST  47   // rev 6b: display RES through C5 pin 3 (680 Ω to GND on LG: -1 would hold it in reset)
 #define PIN_DISP_CS   49
 #define PIN_DISP_DC   53
 
 // ---------------- Display ----------------
-#define DISPLAY_VARIANT 1          // 1 = MSP1691 (280x240 landscape); 2 = MSP1901 has no layouts since display rev 3
+#define DISPLAY_VARIANT 2          // 2 = 1.9" 170x320 (320x170 landscape, rev 6b, screens170.*); 1 = 1.69" 280x240 (screens.*)
 #define DISP_SPI_HZ     4000000UL
 // Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
 // MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
 // The banner prints which one a build is for. Set back to 0 before flashing the real controller.
-#define DISP_TARGET_ILI9341_SIM 1
+#define DISP_TARGET_ILI9341_SIM 0
 #if DISP_TARGET_ILI9341_SIM
 #define DISP_INVERT     0
 #define DISP_BGR        1
@@ -43,9 +44,9 @@
 #define DISP_BGR        0          // set if red and blue are swapped
 #define DISP_MIRROR_X   0          // set if text is mirrored
 #endif
-#define DISP_ROTATION   1          // landscape 280x240; 3 = landscape upside down
+#define DISP_ROTATION   1          // landscape; 3 = landscape upside down
 #define BOOT_SPLASH     1          // penguin "noot noot" splash at boot (non-blocking, ~3 s)
-#define DISP_REINIT_MS  300000UL
+#define DISP_REINIT_MS  300000UL   // self-heal on the 1.5 m run: re-send the init sequence, then redraw everything
 
 // ---------------- Setpoint and margins (°C) ----------------
 #define MARGIN_DP_C        4.0f
@@ -96,6 +97,14 @@
 #define FUSE_DEBOUNCE_MS 1000UL
 #define V12_STABLE_MS    1000UL
 
+// ---------------- Status LED ----------------
+// 1 = decided 2026-10-17: mode colour breathing (Mode 1 white, 2 blue, 3 red), 3 green pulses on a mode change,
+//     12V absent off, fault fast red, alarm yellow flash.
+// 2 = PROPOSAL from the rev 6b change note (not decided): Mode 1 dim white / 2 green / 3 blue solid, sleep = slow
+//     pulse in the mode colour, V2 moving = cyan flash, alarm = amber pulse, fault = fast red, boot / waiting for
+//     valid sensors = purple. Selectable so both can be judged on the real LED.
+#define LED_SCHEME       1
+
 // ---------------- NTC ----------------
 #define NTC_R_PULLUP   10000.0f
 #define NTC_R25        10000.0f
@@ -103,6 +112,8 @@
 #define NTC_OFFSET_T1  0.0f
 #define NTC_OFFSET_T2  0.0f
 #define NTC_OFFSET_T3  0.0f
+#define NTC_ADC_SHORT  8        // ADC below this = probe shorted (~80 Ω), invalid at once
+#define NTC_ADC_OPEN   1015     // ADC above this = probe open / unplugged, invalid at once
 #define NTC_MIN_C      -40.0f
 #define NTC_MAX_C      80.0f
 #define NTC_FAULT_MS   2000UL
@@ -116,14 +127,19 @@
 #define SIM_T_MIN_C       -30.0f   // at 0 ohm
 #define SIM_T_MAX_C       50.0f    // at 10k
 #define SIM_SHORT_OHM     50.0f
-// Only honoured when NTC_TRIMPOT_SIM is 1 — for a breadboard without Board 1 / pump:
+// Bench without the 12V supply / pump (independent of NTC_TRIMPOT_SIM). Banner and display show SIM. Never ship.
+// SIM_FORCE_12V: S1..S3 read as present, so the state machine runs (homing, start, RUN, stop) and every
+// output can be watched on a meter / LED; nothing moves without 12V.
 #define SIM_FORCE_12V     0        // treat S1..S3 as present
-#define SIM_FAKE_P2_TACH  0        // report 3000 rpm whenever PEN is on (no stall fault)
+#define SIM_FAKE_P2_TACH  0        // report 3000 rpm whenever PEN is on (no P2 stall fault)
+#define SIM_FAKE_FAN_TACH 0        // report fan rpm from the PWM % (no fan stall alarms)
+#define SIM_ACTIVE (NTC_TRIMPOT_SIM || SIM_FORCE_12V || SIM_FAKE_P2_TACH || SIM_FAKE_FAN_TACH)
 
 // ---------------- SHT3x ----------------
 #define SHT_PERIOD_MS   2000UL
 #define SHT_FAIL_LIMIT  3
 #define SHT_GOOD_LIMIT  3
+#define SHT_WIRE_TIMEOUT_US 25000UL   // rev 6b: Wire timeout; after one, the bus is recovered (9 SCL pulses)
 // RH calibration offsets, added to the reading (% RH), corrected RH clamped to 0..100.
 // A/B from a side-by-side run (2026-10-28): A read low, B high.
 #define SHT_RH_OFFSET_A  1.15f   // SHT31 A 0x44

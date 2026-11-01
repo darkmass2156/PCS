@@ -326,7 +326,7 @@ void setup() {
   PCICR |= _BV(PCIE0);
   Wire.begin();
   Wire.setClock(50000);
-  Wire.setWireTimeout(5000, true);
+  Wire.setWireTimeout(25000, true);   // as the firmware (rev 6b)
   Serial.begin(115200);
   benchBanner(F("10_v2_calibration"));
   Serial.println(F("A: BTN1/BTN2 short = timed open/close run | B: BTN1 long = backlash"));

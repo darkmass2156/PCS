@@ -28,7 +28,7 @@ static NtcChan ntc[3] = {
 static uint32_t ntcAt;
 
 static float ntcToC(float adc) {
-  if (adc < 1.0f || adc > 1022.0f) return NAN;   // short / open
+  if (adc < NTC_ADC_SHORT || adc > NTC_ADC_OPEN) return NAN;   // short / open
   float r = NTC_R_PULLUP * adc / (1023.0f - adc);
 #if NTC_TRIMPOT_SIM
   if (r < SIM_SHORT_OHM || r > 10500.0f) return NAN;
@@ -47,9 +47,10 @@ static void ntcUpdate(uint32_t now) {
     uint16_t sum = 0;
     for (uint8_t i = 0; i < 4; i++) sum += analogRead(ch.pin);
     float adc = sum / 4.0f;
-    if (!ch.primed) { ch.adcF = adc; ch.primed = true; }
+    bool openShort = adc < NTC_ADC_SHORT || adc > NTC_ADC_OPEN;   // judged on the raw reading, not the filter
+    if (!ch.primed || openShort) { ch.adcF = adc; ch.primed = !openShort; }   // restart the filter on recovery
     ch.adcF += (adc - ch.adcF) / 8.0f;  // ~0.8 s time constant at 10 Hz
-    float c = ntcToC(ch.adcF);
+    float c = openShort ? NAN : ntcToC(ch.adcF);
     if (!isnan(c) && !NTC_TRIMPOT_SIM) c += ch.offset;
     NtcReading &o = *ch.out;
     o.c = c;
@@ -76,16 +77,52 @@ static uint8_t crc8(const uint8_t *d, uint8_t n) {
   return crc;
 }
 
+uint16_t i2cRecoveries;
+
+static void wireStart() {
+  Wire.begin();
+  Wire.setClock(50000);                          // ~1.5 m run to the case
+  Wire.setWireTimeout(SHT_WIRE_TIMEOUT_US, true);   // a stuck bus can't hang the loop
+}
+
+// After a Wire timeout: release the TWI, clock SCL 9 times so a slave holding SDA low finishes its byte,
+// send a STOP, then restart Wire. The 4.7k pull-ups on LG pull the lines high (INPUT, not OUTPUT HIGH).
+static void wireRecover() {
+  Wire.end();
+  pinMode(SDA, INPUT);
+  for (uint8_t k = 0; k < 9 && digitalRead(SDA) == LOW; k++) {
+    pinMode(SCL, OUTPUT);   // PORT bit is 0 after Wire.end(): OUTPUT = LOW
+    delayMicroseconds(10);
+    pinMode(SCL, INPUT);
+    delayMicroseconds(10);
+  }
+  pinMode(SDA, OUTPUT);     // STOP: SDA low -> high while SCL is high
+  delayMicroseconds(10);
+  pinMode(SDA, INPUT);
+  delayMicroseconds(10);
+  wireStart();
+  Wire.clearWireTimeoutFlag();
+  i2cRecoveries++;
+}
+
+static bool wireTimedOut() {
+  if (!Wire.getWireTimeoutFlag()) return false;
+  wireRecover();
+  return true;
+}
+
 static bool busWrite(uint8_t i, const uint8_t *d, uint8_t n) {
   if (i == SHT_R) return bus2.write(shtAddr[i], d, n);
   Wire.beginTransmission(shtAddr[i]);
   Wire.write(d, n);
-  return Wire.endTransmission() == 0;
+  bool ok = Wire.endTransmission() == 0;
+  return !wireTimedOut() && ok;
 }
 
 static bool busRead(uint8_t i, uint8_t *d, uint8_t n) {
   if (i == SHT_R) return bus2.read(shtAddr[i], d, n);
-  if (Wire.requestFrom(shtAddr[i], n) != n) return false;
+  bool ok = Wire.requestFrom(shtAddr[i], n) == n;
+  if (wireTimedOut() || !ok) return false;
   for (uint8_t k = 0; k < n; k++) d[k] = Wire.read();
   return true;
 }
@@ -155,9 +192,7 @@ float dewPointMax(uint8_t &validCount, float &spread) {
 }
 
 void sensorsInit() {
-  Wire.begin();
-  Wire.setClock(50000);                // ~1.5 m run to the case
-  Wire.setWireTimeout(5000, true);     // a stuck bus can't hang the loop
+  wireStart();
   bus2.begin();
   for (ShtReading &s : sht) {
     s.t = s.rh = s.dp = NAN;

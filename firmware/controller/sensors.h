@@ -18,6 +18,7 @@ struct ShtReading {
 
 extern NtcReading ntcT1, ntcT2, ntcT3;
 extern ShtReading sht[SHT_COUNT];
+extern uint16_t i2cRecoveries;   // Wire bus recoveries after a timeout (shown by '?')
 
 void sensorsInit();
 void sensorsUpdate(uint32_t now);   // non-blocking, call every loop pass

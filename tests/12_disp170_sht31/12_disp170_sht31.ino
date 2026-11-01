@@ -17,7 +17,7 @@
 //   display  module SDA -> D51 (MOSI), SCL -> D52 (SCK)  (SPI, NOT the I2C pins D20/D21 despite the labels)
 //            CS -> D49, DC -> D53, RES -> D48, all five through 1k/2k dividers (3.3 V logic).
 //            VCC 3V3, GND, BLK open or 3V3. A floating RES keeps the panel in reset: black with backlight on.
-//            Set TFT_RST -1 only if RES has its own pull-up / RC (as on the controller's C4 cable).
+//            Rev 6b box: RES is on D47 (C5 pin 3) with a 680 Ω to GND on LG, so TFT_RST must be 47.
 //   SHT31    SDA D20, SCL D21 (4.7k-10k pull-ups to 5V; most breakouts have them), VIN 5V, GND.
 //            A: ADDR to GND = 0x44, B: ADDR to VIN = 0x45.
 //
@@ -49,7 +49,7 @@
 #define SINGLE_ADDR 0x44    // SENSORS 1: address at boot (0x44 ADDR to GND, 0x45 ADDR to VIN)
 #define SHT_RH_OFFSET_A  1.15f  // RH calibration (% RH, as config.h): 0x44 read low, 0x45 high. Raw ticks stay raw.
 #define SHT_RH_OFFSET_B -1.15f
-#define TFT_RST 48          // pin wired to the module's RES (via divider), or -1
+#define TFT_RST 47          // rev 6b: RES on D47; -1 only for a module whose RES has its own pull-up
 #define ROTATION 1          // 3 = landscape upside down
 const uint16_t W = 320, H = 170;
 
@@ -92,6 +92,36 @@ float dewPoint(float t, float rh) {
   return b * g / (a - g);
 }
 
+uint16_t recoveries;
+
+void wireStart() {
+  Wire.begin();
+  Wire.setClock(50000);
+  Wire.setWireTimeout(25000, true);   // rev 6b: 25 ms, then the bus is recovered
+}
+
+// After a Wire timeout: 9 SCL pulses so a slave holding SDA low finishes its byte, a STOP, restart Wire.
+// True if there was a timeout.
+bool wireTimedOut() {
+  if (!Wire.getWireTimeoutFlag()) return false;
+  Wire.end();
+  pinMode(SDA, INPUT);
+  for (uint8_t k = 0; k < 9 && digitalRead(SDA) == LOW; k++) {
+    pinMode(SCL, OUTPUT);   // PORT bit is 0: OUTPUT = LOW, INPUT = released to the pull-up
+    delayMicroseconds(10);
+    pinMode(SCL, INPUT);
+    delayMicroseconds(10);
+  }
+  pinMode(SDA, OUTPUT);
+  delayMicroseconds(10);
+  pinMode(SDA, INPUT);
+  wireStart();
+  Wire.clearWireTimeoutFlag();
+  recoveries++;
+  Serial.print(F("--- I2C timeout: bus recovered (")); Serial.print(recoveries); Serial.println(F(") ---"));
+  return true;
+}
+
 // Sends a 16-bit command. Returns the Wire code (0 ok, 2 address NACK, 3 data NACK, 5 timeout).
 uint8_t command(uint8_t addr, uint16_t cmd) {
   Wire.clearWireTimeoutFlag();
@@ -99,7 +129,7 @@ uint8_t command(uint8_t addr, uint16_t cmd) {
   Wire.write((uint8_t)(cmd >> 8));
   Wire.write((uint8_t)cmd);
   uint8_t e = Wire.endTransmission();
-  return Wire.getWireTimeoutFlag() ? 5 : e;
+  return wireTimedOut() ? 5 : e;
 }
 
 void trigger(Sht &s) {   // single shot, high repeatability, no clock stretching
@@ -123,7 +153,7 @@ void fetch(Sht &s) {
   if (s.err) return;   // trigger already failed (counted there)
   Wire.clearWireTimeoutFlag();
   if (Wire.requestFrom(s.addr, (uint8_t)6) != 6) {
-    if (Wire.getWireTimeoutFlag()) { s.err = E_TMO; s.tmo++; }
+    if (wireTimedOut()) { s.err = E_TMO; s.tmo++; }
     else { s.err = E_READ; s.nackR++; }
     return;
   }
@@ -640,9 +670,7 @@ void setup() {
   benchBanner(F("12_disp170_sht31"));
   help();
   benchButtonsBegin();
-  Wire.begin();
-  Wire.setClock(50000);
-  Wire.setWireTimeout(5000, true);
+  wireStart();
   scan();
   if (NS == 1) snprintf(sht[0].name, sizeof(sht[0].name), "0x%02X", sht[0].addr);
   for (Sht &s : sht) sensorInit(s);

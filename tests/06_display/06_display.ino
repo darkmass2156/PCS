@@ -1,4 +1,4 @@
-// 06_display — ST7789 at 4 MHz, CS D49, DC D53, RST -1 (power-on RC), via the C4 cable.
+// 06_display — ST7789 at 4 MHz, CS D49, DC D53, RES D47 (rev 6b, C5 pin 3), via the C4 cable.
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library".
 // Set DISPLAY_VARIANT to the panel fitted, upload, check:
 //   - a 1 px white frame touches all four edges (offset OK; if shifted ~20 rows, report it)
@@ -14,7 +14,7 @@
 #include <Adafruit_ST7789.h>
 #include "bench.h"
 
-#define DISPLAY_VARIANT 1   // 1 = MSP1691 (landscape 280x240), 2 = MSP1901 (landscape 320x170)
+#define DISPLAY_VARIANT 2   // 2 = 1.9" (landscape 320x170, rev 6b), 1 = 1.69" (landscape 280x240)
 #define ROTATION 1          // 3 = landscape upside down
 
 #if DISPLAY_VARIANT == 1
@@ -23,7 +23,7 @@ const uint16_t IW = 240, IH = 280, W = 280, H = 240;   // init with the native p
 const uint16_t IW = 170, IH = 320, W = 320, H = 170;
 #endif
 
-Adafruit_ST7789 tft(49, 53, -1);
+Adafruit_ST7789 tft(49, 53, 47);   // RES on D47: -1 leaves the rev 6b panel in reset (680 Ω to GND)
 bool inv = true, bgr = false;
 
 void initSeq() {

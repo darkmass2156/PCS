@@ -1,6 +1,7 @@
 #include "ui.h"
 #include "config.h"
 #include "control.h"
+#include "valve.h"
 
 // ---------------- Buttons ----------------
 // Active LOW with hardware RC; 30 ms software debounce on top.
@@ -56,10 +57,12 @@ static const Rgb C_OFF = {0, 0, 0};
 static const uint16_t BREATH_MS = 4000;
 static const uint16_t GREEN_ON_MS = 120, GREEN_PERIOD_MS = 250, GREEN_COUNT = 3;
 
+#if LED_SCHEME != 2
 static bool modeSeen;
 static Mode shownMode;
 static uint32_t modeChangedAt;
 static bool greenActive;
+#endif
 
 static void ledWrite(const Rgb &c) {
   analogWrite(PIN_LED_R, c.r);
@@ -78,6 +81,23 @@ static Rgb scale(const Rgb &c, uint8_t k) {
   return {(uint8_t)(c.r * k / 255), (uint8_t)(c.g * k / 255), (uint8_t)(c.b * k / 255)};
 }
 
+#if LED_SCHEME == 2
+// PROPOSAL (rev 6b change note, not decided): solid mode colours, sleep pulses, V2 moving flashes cyan,
+// alarm amber pulse, fault fast red, boot / waiting for valid sensors purple. 12V absent: the mode colour.
+static const Rgb C_DIMWHITE = {50, 50, 50};
+static const Rgb C_CYAN = {0, 200, 200};
+static const Rgb C_PURPLE = {150, 0, 200};
+
+static Rgb ledFor(uint32_t now) {
+  if (now < BOOT_GRACE_MS || st.dpValid == 0) return C_PURPLE;            // boot / waiting for sensors
+  if (st.state == ST_SAFE) return (now / 125) % 2 ? C_RED : C_OFF;          // fault latched: 4 Hz
+  if (valveBusy() && now % 500 < 120) return C_CYAN;                         // V2 moving
+  if (st.alarms) return scale(C_YELLOW, breath(now));                       // amber pulse
+  const Rgb &c = st.mode == MODE_OFF ? C_DIMWHITE : st.mode == MODE_LOADCAP ? C_GREEN : C_BLUE;
+  if (st.mode != MODE_OFF && st.state == ST_IDLE) return scale(c, breath(now));   // sleep
+  return c;
+}
+#else
 static Rgb ledFor(uint32_t now) {
   if (!modeSeen) {
     modeSeen = true;
@@ -99,6 +119,7 @@ static Rgb ledFor(uint32_t now) {
   const Rgb &c = st.mode == MODE_OFF ? C_WHITE : st.mode == MODE_LOADCAP ? C_BLUE : C_RED;
   return scale(c, breath(now));
 }
+#endif
 
 void uiInit() {
   uint32_t now = millis();

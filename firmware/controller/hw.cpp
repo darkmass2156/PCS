@@ -101,8 +101,11 @@ void hwUpdateTach(uint32_t now) {
   rpmFan1 = (uint16_t)((f1 * 30000UL) / dt);
   rpmFan2 = (uint16_t)((f2 * 30000UL) / dt);
   rpmPump = (uint16_t)((p * 30000UL) / dt);
-#if NTC_TRIMPOT_SIM && SIM_FAKE_P2_TACH
+#if SIM_FAKE_P2_TACH
   if (hwPen()) rpmPump = 3000;
+#endif
+#if SIM_FAKE_FAN_TACH
+  rpmFan1 = rpmFan2 = hwFanPct() * 30;   // iPPC-3000: ~30 rpm per %
 #endif
 }
 
@@ -115,7 +118,7 @@ static uint32_t v12ChangeAt;
 void hwUpdateFuses(uint32_t now) {
   for (uint8_t i = 0; i < 3; i++) {
     uint16_t a = analogRead(fusePins[i]);
-#if NTC_TRIMPOT_SIM && SIM_FORCE_12V
+#if SIM_FORCE_12V
     a = 1023;
 #endif
     fuseAdc[i] = a;

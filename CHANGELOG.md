@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-01 | 0.5.0 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.0` |
 | 2026-10-28 | 0.4.9 + lite 1.3 | 6 | 1.6 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.9` |
 | 2026-10-28 | 0.4.8 + lite 1.2 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.8` |
 | 2026-10-28 | 0.4.7 + lite 1.1 | 6 | 1.5 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.7` |
@@ -30,6 +31,38 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.5.0, DISP rev 7, lite170 1.4, BENCH 1.7, HW rev 6b — 2026-11-01
+From Vlad's change note `docs/changes/hw_rev6b.md` (hardware rev 6b; logic rev 2 unchanged).
+AVR build of all 16 sketches (`tools/avr_build/build.sh all`): OK, 0 warnings; controller also built with
+`LED_SCHEME 2`, `DISPLAY_VARIANT 1`, every SIM switch. Not yet run on the rev 6b boards.
+
+### Changed (FW)
+- `HW_REV` "6b". Display: the 1.9" 320x170 is the controller's panel now (`DISPLAY_VARIANT 2`, default):
+  `screens170.*` moved from lite170 into `firmware/controller/` (canonical) and is used by `display.cpp`;
+  the 1.69" layouts stay as variant 1. `DISP_TARGET_ILI9341_SIM` default 0 (real ST7789).
+- Display RES on **D47** (`PIN_DISP_RST`); `init()` pulses it. The 5-min self-heal re-init is now followed by a
+  full redraw.
+- SHT31 bus: `Wire.setWireTimeout(25000, true)`, and after a timeout a bus recovery (9 SCL pulses, STOP, Wire
+  restart; counted, shown by `?`).
+- NTC open/short judged on the raw ADC (< 8 / > 1015): invalid at once (the filter restarts on recovery);
+  the fault still needs 2 s (safety rule 5).
+- Serial `#` event lines: state / mode changes, and every fault and alarm by name (all active ones at the end of
+  the boot grace, then each ON / off), also with `?`.
+- Bench switches `SIM_FORCE_12V`, `SIM_FAKE_P2_TACH` no longer need `NTC_TRIMPOT_SIM`; new `SIM_FAKE_FAN_TACH`.
+  Any SIM switch marks the banner and the display.
+- `LED_SCHEME 2`: the rev 6b proposed LED table, selectable (PROPOSAL; scheme 1 stays the default).
+
+### Changed (lite170 1.4, bench 1.7)
+- RES D47 in lite170, `06_display`, `11_ui_dev`, `12_disp170_sht31`. 25 ms Wire timeout + bus recovery in lite170
+  and `12_disp170_sht31`; 25 ms in `02`, `10`. `06_display` and `11_ui_dev` default to the 1.9" (variant 2);
+  `11_ui_dev` runs the 320x170 screens.
+
+### Added
+- `tests/13_led_pins`: D9 / D10 / D11 one at a time with the pin printed, white, off; PWM fades; colour sample of
+  both LED schemes.
+- CLAUDE.md: hardware rev 6b (PW/LG boards, pin map with D47, 330/680 dividers, BLK not connected, AL pins left
+  open, PC-USB grounding and the Mac ground loop), LED proposal recorded as OPEN.
 
 ## FW 0.4.9, lite170 1.3, BENCH 1.6 — 2026-10-28
 AVR build of all sketches (`tools/avr_build/build.sh all`): OK, 0 warnings.

@@ -7,10 +7,10 @@ coolant entering the PC must never drop below in-case dew point + margin.
 ## Revisions (current)
 | Item | Rev | Where |
 |---|---|---|
-| Hardware | 4b + display CS mod + SHT30 on D34/D36 | this file, `docs/build_component_list_rev4b.xlsx` |
+| Hardware | **6b** (PW + LG boards, display RES on D47, 1.9" display, SHT30 header) | this file; change note `docs/changes/hw_rev6b.md`; BOM `docs/build_component_list_rev4b.xlsx` (rev 4b) |
 | Schematic | rev11 | `docs/schematics/full_loop_schematic_rev11.png` |
 | Control logic | rev 2 | this file → Control; change note `docs/changes/logic_rev2.md` |
-| Display software | rev 6 (Pingu crashes into ROG, one screen per mode, AA fonts in all modes) | this file → Display; `DISPLAY_REV` in `version.h` |
+| Display software | rev 7 (1.9" 320x170 layouts in the controller, Pingu crashes into ROG, AA fonts) | this file → Display; `DISPLAY_REV` in `version.h` |
 | Firmware | see `firmware/controller/version.h` | `CHANGELOG.md` |
 
 ### How revisions are tracked
@@ -37,9 +37,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   the button map is in the sketch header and printed at boot. Serial commands stay as a backup.
 - Shared bench code is `tests/common/bench.h` (canonical, `BENCH_VERSION`); each test folder holds an
   identical copy. Same for `softi2c.*` and the display files `fonts.h`, `scr_gfx.*`, `scr_data.h`, `screens.*`, `splash.h`,
-  `boot_sprite.h`, `rog_logo.h` (canonical in `firmware/controller/`, copied into `tests/11_ui_dev` and
-  `firmware/lite170` (not `screens.*`); `fonts.h` and `scr_gfx.*` also into `tests/12_disp170_sht31`).
-  `screens170.*` are canonical in `firmware/lite170/`; `bench.h` is copied there too.
+  `boot_sprite.h`, `rog_logo.h`, `screens170.*` (all canonical in `firmware/controller/`, copied into
+  `tests/11_ui_dev`, and except `screens.*` into `firmware/lite170`; `fonts.h` and `scr_gfx.*` also into
+  `tests/12_disp170_sht31`). `bench.h` is copied into `firmware/lite170` too.
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
   Everything else (SHT3x, soft I2C) is in-tree.
@@ -63,10 +63,14 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | T_out | outdoor temperature estimate (see Feasibility) | — |
 
 ## Hardware
-- **Controller**: MEGA2560 R3 (CH340), powered over USB from the PC.
-  The 12V for loads comes from the PC PSU on a separate harness, so USB can be live while
-  12V is off (S3/S5).
-- **Boards**: two 60x80 perfboards (rev 4b). Board 1 = power, Board 2 = logic, linked by 34-pin ribbons.
+- **Controller**: MEGA2560 R3 (CH340), powered over USB from the **PC** (C6, mandatory: one ground with the 12V
+  from the PC PSU and the in-case parts). USB can be live while 12V is off (S3/S5).
+  Programming from a Mac on mains makes a ground loop that corrupts the display SPI: Mac on battery, a USB
+  isolator (ADuM3160), or plug it in only to upload.
+- **Boards (rev 6b)**: two 60x80 perfboards. **PW** (fuses, FETs, field terminals) and **LG** (all logic).
+  PW ↔ LG: 16 soldered wires (PW strip col 22 rows A–P ↔ LG row A, GND on wires 8–9).
+  LG ↔ Mega: 34-pin ribbon (red stripe = pin 34) split into Dupont housings H1–H8. 24 AWG on LG, 20/22 AWG power on PW.
+  V2 flyback diodes are SB560 (band on the switched side).
 - **P1**: in the case, controlled by the PC (Apex). Not on the Mega.
 - **P2**: the Mega switches its 12V (PEN) and drives PWM and tach.
 - **V2**: CR-02 12V, T-port, DN15, 3-wire with autostop.
@@ -75,9 +79,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - **NTCs**: 3× Bykski B-PD5-TMR 10k probes on the Mega (T1, T2, T3). The cube NTC goes to the Apex.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
   because 0x44/0x45 are taken). SHT30 powered from the Mega header 5V/GND; no board change.
-- **Display**: one ST7789 IPS screen in the case (see Display), mounted landscape. The 1.69" MSP1691 is the
-  one in use (280x240 landscape). The 1.9" (variant 2) has no dashboard layouts since display rev 3.
-  The 0.91" I2C OLEDs are **not** used.
+- **Display**: one ST7789 IPS screen in the case (see Display), mounted landscape. Rev 6b: the **1.9" 170x320**
+  (320x170 landscape, `DISPLAY_VARIANT 2`). The 1.69" 280x240 (variant 1) layouts stay in the code.
+  BLK not connected (backlight always on). The 0.91" I2C OLEDs are **not** used.
 - **Top panel**: 570X buttons BTN1 and BTN2, plus an RGB status LED under the power button.
   Button 3 and the power button go to the Apex, not the Mega.
 - **Switched outputs**: all are **Mega HIGH = on**. Hardware pull-downs keep everything off during reset.
@@ -85,7 +89,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - PEN: BC547 → IRF4905 high-side, switching P2's 12V (PWM alone can't stop a D5).
   - SEN: IRLB8721 low-side, driving V1 (HIGH = energised = open).
 
-## Pin map (rev 4b + display CS mod + SHT30 — authoritative)
+## Pin map (rev 6b — authoritative)
 | Pin | Signal | Notes |
 |---|---|---|
 | A0 | S1 | P2 fuse sense, 47k/20k divider (12V ≈ 3.58 V) |
@@ -106,12 +110,14 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | D26 | PEN | P2 enable |
 | D28 | SEN | V1 enable |
 | D30 / D32 | BTN1 / BTN2 | 10k pull-up, 1k + 100 nF RC, active LOW |
-| D34 / D36 | SDA2 / SCL2 | SHT30, software I2C (module pull-ups + internal pull-ups) |
-| D49 | DISP_CS | ST7789 CS via 330/660 Ω divider, Mega ribbon pin 32 |
-| D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 330/660 Ω dividers; D50 unused |
+| D34 / D36 | SDA2 / SCL2 | SHT30, software I2C (4.7k pull-ups to 5V on LG) |
+| D47 | DISP_RES | ST7789 RES via 330/680 Ω divider (680 Ω to GND: must be driven), C5 pin 3 — rev 6b |
+| D49 | DISP_CS | ST7789 CS via 330/680 Ω divider |
+| D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 330/680 Ω dividers; D50 (MISO) unused, not wired |
 | 3.3V pin | display 3V3 | powers the ST7789, backlight included |
 
 ## Connectors (for bench wiring)
+- Rev 4b connector notes below; rev 6b moved Board 1/2 to PW/LG (see Boards), the field side is unchanged.
 - **Board 1 screw terminals** (row AA):
   - X1: +12V in, spare, GND in, T3 NTC
   - X2: T3 NTC return, T2 NTC, T2 NTC return, spare
@@ -125,9 +131,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - C2 4P: SHT31 ×2 (5V, GND, SDA, SCL)
   - C3 6P: top panel (BTN1, BTN2, LED R, G, B, GND)
   - C4 6P: display (GND, 3V3, SCK, MOSI, DC, CS)
-  - C5 3P: T1 NTC (NTC, GND, spare) — rerouted from the GPU block to the loop return
+  - C5 3P: T1 NTC (NTC, GND) + **display RES on pin 3** (rev 6b) — T1 rerouted from the GPU block to the loop return
   - C6: USB to the Mega (no GX12)
-- **Board 2 display CS mod** (on top of rev 4b):
+- **Board 2 display CS mod** (rev 4b history; on rev 6b LG all display lines have 330/680 Ω dividers):
   - R22 330 Ω at L7–P7, R23 660 Ω at Q7–U7 (originally 1k/2k; all display dividers changed 2026-10-27,
     see `docs/changes/display_dividers.md`).
   - Bridges P7–Q7 and U7–V7.
@@ -142,13 +148,17 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - Resistance: R = 10000 · adc / (1023 − adc).
   - One Beta (ASSUMED 3435 until `01_ntc` measures it) plus a per-sensor offset from ice-water calibration.
   - Failure modes: a short reads HOT (the dangerous direction); an open circuit reads cold.
+  - Raw ADC < `NTC_ADC_SHORT` (8) or > `NTC_ADC_OPEN` (1015) = shorted / open: value invalid at once (shows "--"),
+    the NTC fault still follows rule 5 (2 s).
 - **Fuse sense**: compare against thresholds with hysteresis (see Tunables). Binary present/absent check.
 - **Tach**: open-collector, 10k pull-up to 5V, 2 pulses/rev.
 - **PWM**: Timer3, fast PWM mode 14, no prescaler, ICR3 = 639 → 25 kHz.
   - 0 % disconnects the compare output and holds the pin LOW (OCR = 0 still gives a 62 ns spike).
   - Use no libraries that take Timer3. Leave Timer1 and Timer2 alone (they drive the LED).
 - **SHT31 ×2**: A = 0x44 (top-rear, near CPU) and B = 0x45 (mid-case, near GPU/RAM). Hardware I2C at 50 kHz,
-  `Wire.setWireTimeout` on. Check the CRC on every read.
+  `Wire.setWireTimeout(25000, true)`; after a timeout the bus is recovered (9 SCL pulses, STOP, Wire restart).
+  Check the CRC on every read. **AL/ALERT pins unconnected** on all SHT3x: 5V on AL shorts the output and heats
+  the sensor (cause of the 67–71 °C bench readings).
 - **SHT30**: 0x44 on its own software I2C bus (D34/D36), same command set and CRC.
 - **RH calibration** (2026-10-28, side-by-side run; 0.75 first, 1.15 since FW 0.4.9): A 0x44 +1.15 % RH, B 0x45 −1.15 % RH, R 0. Added to the
   reading, clamped to 0…100, before the dew point; in the firmware, lite170 and the SHT test sketches.
@@ -161,15 +171,16 @@ coolant entering the PC must never drop below in-case dew point + margin.
   **Set 0 before flashing the real controller.**
 - **Landscape** (display rev 1): `DISP_ROTATION 1` (3 if mounted upside down). `init()` takes the panel's native
   portrait size (240x280), the rotation turns it into 280x240.
-- **Variant**: `DISPLAY_VARIANT 1` = MSP1691, 1.69", **280x240** landscape. Display rev 3 screens are drawn for
-  280x240 only; variant 2 (1.9" 320x170) stops with a compile error until it gets its own layouts.
+- **Variant**: `DISPLAY_VARIANT 2` (default, rev 6b) = 1.9" 170x320 → **320x170** landscape, `screens170.*`
+  (layouts as in the Lite build below). `DISPLAY_VARIANT 1` = 1.69" MSP1691, **280x240**, `screens.*`.
 - **Library**: Adafruit_ST7789 + Adafruit_GFX. Use `init(240, 280)` or `init(170, 320)`; the library handles the panel offsets.
 - **Field report (1.69", one buyer)**: Adafruit with `init(240, 280)` worked. Fallbacks (`config.h`):
   - red and blue swapped → `DISP_BGR 1`
   - colors look negative → flip `DISP_INVERT`
   - image shifted by 20 rows → apply the 20-row offset manually (normally `init(240, 280)` handles it)
   Remaining risks: no reset pin, 5V resistor-divider level shifting, and a ~1.5 m cable.
-- **Wiring**: CS = 49 (through the divider), RST = -1 (10k + 100 nF power-on RC at the display), default SPI mode.
+- **Wiring** (rev 6b): CS = 49, DC = 53, **RES = 47** (all through 330/680 Ω dividers), default SPI mode. RES has the
+  680 Ω to GND, so RST = -1 would hold the panel in reset (backlight only). `init()` pulses RES.
 - **SPI clock**: 4 MHz (`DISP_SPI_HZ`). The finished 1.5 m C4 cable with the 330/660 Ω dividers worked up to
   6 MHz on the bench (2026-10-27); 4 MHz keeps margin. `init()` itself runs at the library default, so the firmware
   sets `DISP_SPI_HZ` and then re-sends the init sequence (SWRESET → SLPOUT → COLMOD → NORON → DISPON) at it.
@@ -179,9 +190,12 @@ coolant entering the PC must never drop below in-case dew point + margin.
   the screens redraw only widgets whose content changed, one widget per loop pass, text with background colour
   and segment digits by changed segment, so nothing flickers. A mode change clears the screen (in strips) and
   rebuilds it over a few passes — the only full-screen fills besides the boot sequence.
-- **Self-heal**: non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min. A small dot in the header
-  toggles every second (no clock). The RGB LED stays the authoritative status.
-- **Boot sequence** (`splash.h`, `BOOT_SPLASH 1`, ~5.3 s at 2 MHz, non-blocking, streamed through address windows):
+- **Self-heal**: non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min, then a full redraw (the same
+  rebuild as a mode change) that repairs any corrupted pixels. A small dot in the header toggles every second
+  (no clock). The RGB LED stays the authoritative status.
+- `SPI_DEFAULT_FREQ` (library init speed, 8 MHz on AVR) is a `#define` inside the library .cpp and can't be set
+  from the sketch; the firmware re-sends the whole init sequence at `DISP_SPI_HZ` right after `init()` instead.
+- **Boot sequence** (`splash.h`, `BOOT_SPLASH 1`, ~5.3 s at 2 MHz on 280x240, ~4 s at 4 MHz on 320x170, non-blocking, streamed through address windows):
   1. Pingu: one of three penguins at random (hobo with stick and bundle, sitting with the long trumpet, bowing
      with O-lips), never the same twice in a row (EEPROM boot counter addr 2, last shown addr 3). Noots, and
      crashes in the middle of the second noot (beak stuck open).
@@ -192,7 +206,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
      Logo: `docs/display/rog_logo_280x240.png` → `tools/sprites/make_rog.py` → `rog_logo.h`.
   3. ROG: a red scan crosses the white logo, red underline + "PCS fw x.y.z", hold, clear to black.
   Pingu sprites: original pixel art, `tools/sprites/make_pingu.py` → `boot_sprite.h`.
-- **Screens** (`screens.cpp`, palette F3F3F3 / B2B2B2 / 525152 / 420704 / A71C1E / DE272C + black):
+- **Screens** (`screens.cpp` 280x240 / `screens170.cpp` 320x170, same design; palette F3F3F3 / B2B2B2 / 525152 / 420704 / A71C1E / DE272C + black):
   - Mode 1 *standard*: black, white values, anti-aliased fonts (`fonts.h`: FreeSans Bold for the big
     temperatures, DejaVu Sans / Sans Bold for labels and values). Outside rad / loop 1 return / mixing valve big,
     case and room cards (temp, humidity, dew point), tiles for cooling W, external loop OPEN/CLOSED,
@@ -210,8 +224,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - **Fonts** (`fonts.h`, generated by `tools/fonts/make_fonts.py`): 2-bit anti-aliased proportional bitmaps,
   drawn by `ftxt()` through one address window per field with the background filled (no flicker, no RAM
   buffer). Each glyph cell holds all its ink (oblique overhang included). ~12 KB flash. Used in all three modes (the built-in 5x7 font is left only in the splash version line).
-- **Lite build** (`firmware/lite170`, `LITE_VERSION` "lite 1.3"): the 1.9" (`init(170, 320)`, landscape 320x170,
-  4 MHz, RES on D48 or -1) plus SHT31 A/B, nothing else. Same boot sequence (splash.h adapts to 170 rows: 15 bands,
+- **Lite build** (`firmware/lite170`, `LITE_VERSION` "lite 1.4"): the 1.9" (`init(170, 320)`, landscape 320x170,
+  4 MHz, RES on D47) plus SHT31 A/B, nothing else. Same boot sequence (splash.h adapts to 170 rows: 15 bands,
   version line under the logo), then the three screens re-laid out for 320x170 in `screens170.*`:
   Mode 1 big temps, one row each for case/room, 2x2 tiles, distance to dew; Mode 2 dew shift lights in the header,
   chips at the bottom; Mode 3 table gains CASE/ROOM rows and FLAG (fuse/fault/alarm), the chart is 310 s wide and
@@ -330,7 +344,7 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
     Only possible while the PC is on.
 
 ## Status and logging
-- Status LED (`ui.cpp`), decided by Vlad 2026-10-17:
+- Status LED (`ui.cpp`), `LED_SCHEME 1` (default), decided by Vlad 2026-10-17:
   | State | LED |
   |---|---|
   | Mode 1 | white, slow breathing (4 s) |
@@ -340,12 +354,17 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
   | 12V absent | off (ASSUMED; green pulses still show on a mode press) |
   | Latched fault | fast red blink 4 Hz (ASSUMED) |
   | Alarm | 100 ms yellow flash every 2 s over the breathing (ASSUMED) |
+  - PROPOSAL (rev 6b note, not decided), `LED_SCHEME 2`: Mode 1 dim white / Mode 2 green / Mode 3 blue solid,
+    sleep = slow pulse in the mode colour, V2 moving = cyan flash, alarm = amber pulse, fault = fast red blink,
+    boot / no valid DP = purple; 12V absent shows the mode colour. Pick one after `13_led_pins`.
   - Liveness: the LED is computed from `millis()` in `loop()` only (no timer/ISR). A hung loop freezes the
     LED at its current brightness; the 2 s watchdog then resets (LED off) and breathing resumes after boot.
 - Serial CSV at 1 Hz. `#` lines are comments (version banner, header). Columns:
   `ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms`
   (fuses/faults/alarms as hex bitmasks, see `control.h`).
-- Serial input: `?` prints version, tunables and a status line.
+- Serial events (`#` lines): state / mode changes from boot; at the end of the boot grace (10 s) every active
+  fault and alarm by name, then each one as it turns ON / off — to match the LED to a cause.
+- Serial input: `?` prints version, tunables, a status line (incl. I2C recoveries) and all active faults/alarms.
 - Known: opening the COM port toggles DTR and resets the Mega (CH340 auto-reset) → safe boot, V2 re-park.
 
 ## Bench test order
@@ -369,13 +388,16 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
     Night log in EEPROM 16..4095 (never 0..3, the firmware's bytes): T/RH of A and B averaged per `LOG_INTERVAL_S`
     (60 s), 4 bytes/sample, ring of 1016 (16.9 h). BTN1 long new log, BTN2 long stop; survives resets (gap marker);
     log page with T/RH charts; serial `d` dumps CSV.
+14. `13_led_pins` — status LED wiring: D9 / D10 / D11 one at a time (printed), white, off; PWM fades; colour sample
+    of both LED schemes.
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the
   NTC terminals. R 0…10k maps linearly to −30…+50 °C (≈ 3.2 °C/turn). < 50 Ω = short, unplugged = open
   (both raise the NTC fault). Calibration offsets are ignored. Banner and display heartbeat show SIM.
-- For a breadboard without Board 1 / P2: `SIM_FORCE_12V 1` (S1–S3 present) and `SIM_FAKE_P2_TACH 1`
-  (3000 rpm while PEN is on). Only honoured with `NTC_TRIMPOT_SIM 1`. Never ship a SIM build.
+- Without the 12V supply / pump (independent of `NTC_TRIMPOT_SIM`): `SIM_FORCE_12V 1` (S1–S3 read present, the
+  state machine runs and the outputs can be watched), `SIM_FAKE_P2_TACH 1` (3000 rpm while PEN is on),
+  `SIM_FAKE_FAN_TACH 1` (fan rpm = 30 × PWM %). Any SIM switch shows SIM on the banner and display. Never ship one.
 - DP still needs at least one real SHT3x (or the system sits in SAFE with "NO DP").
 
 ### Bench checks required by logic rev 2
@@ -387,7 +409,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 5. **K_POT**: later, on the real loop.
 
 ## Tunables (`config.h`)
-- Display: `DISPLAY_VARIANT` = 1, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
+- Display: `DISPLAY_VARIANT` = 2, `DISP_TARGET_ILI9341_SIM` = 0, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
   `BOOT_SPLASH` = 1
 - Setpoint and margins:
   - `MARGIN_DP_C` = 4.0, `DELTA_ROOM_C` (δ) = 3.0 (TBD, bench check 1), `MODE2_FALLBACK_C` = 20.0
@@ -403,14 +425,18 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
 - Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
-- NTCs: `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C
+- `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `SHT_WIRE_TIMEOUT_US` = 25000
+- NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C
 - `LONG_PRESS_MS` = 2000, `WDT_ENABLE` = 1
 - Bench build: `NTC_TRIMPOT_SIM` = 0, `SIM_T_MIN_C` = −30, `SIM_T_MAX_C` = 50, `SIM_SHORT_OHM` = 50,
-  `SIM_FORCE_12V` = 0, `SIM_FAKE_P2_TACH` = 0
+  `SIM_FORCE_12V` = 0, `SIM_FAKE_P2_TACH` = 0, `SIM_FAKE_FAN_TACH` = 0
 - `FREEZE_GUARD_C` = −20 (PROPOSAL, unused)
 
 ## Open items
 - OPEN: freeze guard behaviour (PROPOSAL, not implemented)
+- OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
+- Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to
+  2 MHz on any glitch); serial log of sensor validity (the `#` event lines)
 - TBD (bench): NTC Beta, V2 direction + travel + backlash, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT
 - Confirm ASSUMED items: T_out definition, wake needs feasibility, Mode 3 degraded behaviour, fault order kept
   for faults, T1 backstop alarm-only with P2 off, fault latching, LED overlays (12V absent / fault / alarm)

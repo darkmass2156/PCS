@@ -32,10 +32,12 @@ static void printHeader() {
 #if DISP_TARGET_ILI9341_SIM
   Serial.println(F("# DISPLAY TARGET: ILI9341 simulator (mirror, BGR, no invert) - not for the real ST7789"));
 #endif
-#if NTC_TRIMPOT_SIM
-  Serial.print(F("# SIM BUILD: NTC inputs are trimpots"));
-  if (SIM_FORCE_12V) Serial.print(F(", 12V forced present"));
-  if (SIM_FAKE_P2_TACH) Serial.print(F(", P2 tach faked"));
+#if SIM_ACTIVE
+  Serial.print(F("# SIM BUILD - not for the loop:"));
+  if (NTC_TRIMPOT_SIM) Serial.print(F(" NTC inputs are trimpots;"));
+  if (SIM_FORCE_12V) Serial.print(F(" 12V forced present;"));
+  if (SIM_FAKE_P2_TACH) Serial.print(F(" P2 tach faked;"));
+  if (SIM_FAKE_FAN_TACH) Serial.print(F(" fan tach faked;"));
   Serial.println();
 #endif
   Serial.println(F("ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,"
@@ -84,6 +86,64 @@ static void logLine(uint32_t now) {
   Serial.println(st.alarms, HEX);
 }
 
+// Fault / alarm / state reasons on Serial ('#' lines, the CSV stays parseable): everything active at boot, then
+// every change, so the LED colour can be matched to a cause.
+static const char FN0[] PROGMEM = "NTC T1 (open/short/out of range)";
+static const char FN1[] PROGMEM = "NTC T2 (open/short/out of range)";
+static const char FN2[] PROGMEM = "NTC T3 (open/short/out of range)";
+static const char FN3[] PROGMEM = "no valid dew point (no SHT)";
+static const char FN4[] PROGMEM = "T2 < DP + 1 with P2 running";
+static const char FN5[] PROGMEM = "T1 < DP + 2 with P2 running";
+static const char FN6[] PROGMEM = "fuse S1 (P2)";
+static const char FN7[] PROGMEM = "fuse S3 (V1 + V2)";
+static const char FN8[] PROGMEM = "P2 stall (no tach)";
+static const char *const FAULT_TXT[] = {FN0, FN1, FN2, FN3, FN4, FN5, FN6, FN7, FN8};
+static const char AN0[] PROGMEM = "fuse S2 (fans)";
+static const char AN1[] PROGMEM = "fan 1 stall";
+static const char AN2[] PROGMEM = "fan 2 stall";
+static const char AN3[] PROGMEM = "SHT31 A 0x44 invalid";
+static const char AN4[] PROGMEM = "SHT31 B 0x45 invalid";
+static const char AN5[] PROGMEM = "SHT30 room invalid";
+static const char AN6[] PROGMEM = "DP spread > 2 C";
+static const char AN7[] PROGMEM = "Mode 3 with < 2 DP sources (Mode 2 setpoint)";
+static const char AN8[] PROGMEM = "T1 < DP + 2 with P2 off";
+static const char AN9[] PROGMEM = "feasibility: forced to bypass";
+static const char *const ALARM_TXT[] = {AN0, AN1, AN2, AN3, AN4, AN5, AN6, AN7, AN8, AN9};
+
+static void printBits(const __FlashStringHelper *kind, uint16_t on, uint16_t off, const char *const *txt, uint8_t n) {
+  for (uint8_t i = 0; i < n; i++) {
+    uint16_t m = 1 << i;
+    if (!((on | off) & m)) continue;
+    Serial.print(F("# "));
+    Serial.print(kind);
+    Serial.print(on & m ? F(" ON:  ") : F(" off: "));
+    Serial.println((const __FlashStringHelper *)txt[i]);
+  }
+}
+
+static void reportEvents(bool all) {
+  static uint16_t faults, alarms;
+  static BranchState state = (BranchState)0xFF;
+  static Mode mode;
+  if (all) {
+    faults = alarms = 0;
+    state = (BranchState)0xFF;
+  }
+  if (st.state != state || st.mode != mode) {
+    Serial.print(F("# state "));
+    Serial.print(stateName(st.state));
+    Serial.print(F(", mode "));
+    Serial.println((uint8_t)st.mode);
+    state = st.state;
+    mode = st.mode;
+  }
+  printBits(F("FAULT"), st.faults & ~faults, faults & ~st.faults, FAULT_TXT, 9);
+  printBits(F("ALARM"), st.alarms & ~alarms, alarms & ~st.alarms, ALARM_TXT, 10);
+  if (all && !st.faults && !st.alarms) Serial.println(F("# no faults, no alarms"));
+  faults = st.faults;
+  alarms = st.alarms;
+}
+
 static void printStatus() {
   printHeader();
   Serial.print(F("# reset flags 0x"));
@@ -102,7 +162,8 @@ static void printStatus() {
   Serial.print(F(" faults live 0x")); Serial.print(st.faultsLive, HEX);
   Serial.print(F(" SHT errs ")); Serial.print(sht[SHT_A].errCount);
   Serial.print(' '); Serial.print(sht[SHT_B].errCount);
-  Serial.print(' '); Serial.println(sht[SHT_R].errCount);
+  Serial.print(' '); Serial.print(sht[SHT_R].errCount);
+  Serial.print(F(" I2C recoveries ")); Serial.println(i2cRecoveries);
 }
 
 void setup() {
@@ -142,8 +203,16 @@ void loop() {
     lastLogAt = now;
     logLine(now);
   }
+  static bool listed;              // state changes from boot; at the end of the boot grace (sensor faults are
+  if (!listed && now >= BOOT_GRACE_MS) {   // evaluated from then on) everything active is listed once
+    reportEvents(true);
+    listed = true;
+  } else reportEvents(false);
   while (Serial.available()) {
-    if (Serial.read() == '?') printStatus();
+    if (Serial.read() == '?') {
+      printStatus();
+      reportEvents(true);
+    }
   }
 
   displayUpdate(now);              // last: never in the safety path

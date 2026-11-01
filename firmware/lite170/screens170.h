@@ -4,7 +4,7 @@
 //   Mode 2 sport     - graphite, slanted numbers and segment bars, dew shift lights in the header
 //   Mode 3 engineer  - grey, P&ID, raw table (incl. case/room), sweeping T2/Tset/DP chart
 // Non-blocking: update() does one small step (a clear strip, a static chunk or one changed widget).
-// Canonical in firmware/lite170/ (the only user so far; the controller's variant 2 can take it over).
+// Canonical in firmware/controller/ (DISPLAY_VARIANT 2); firmware/lite170 and tests/11_ui_dev hold copies.
 #include "scr_data.h"
 #include "scr_gfx.h"
 

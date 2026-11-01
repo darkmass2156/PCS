@@ -4,7 +4,7 @@
 // After editing this file run:  for d in tests/[0-9]*/; do cp tests/common/bench.h "$d"; done
 #include <Arduino.h>
 
-#define BENCH_VERSION "1.6"
+#define BENCH_VERSION "1.7"
 
 // Safety rule 1 for every sketch: all switched outputs LOW before anything else.
 inline void benchOutputsLow() {
@@ -23,8 +23,8 @@ inline void benchBanner(const __FlashStringHelper *name) {
 }
 
 // ---------------- Buttons ----------------
-// BTN1 D30, BTN2 D32, active LOW. INPUT_PULLUP so a bare breadboard button to GND works;
-// harmless with the real panel's 10k pull-up + RC. 30 ms debounce.
+// BTN1 D30, BTN2 D32, active LOW. INPUT_PULLUP so a bare breadboard button to GND works; on the rev 6b LG board
+// (10k pull-up, 1k + 100 nF) the internal ~35k just sits in parallel (the controller firmware uses INPUT). 30 ms debounce.
 // After update(): pressed / released are edges, shortPress fires on release (< 2 s),
 // longPress fires once while held at 2 s.
 struct BenchButton {

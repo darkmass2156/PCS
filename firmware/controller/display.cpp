@@ -12,18 +12,26 @@
 #include <math.h>
 
 #include "splash.h"
+
+// Two panels, each with its own dashboard layouts:
+//   DISPLAY_VARIANT 2: 1.9" 170x320 (rev 6b, in use) -> 320x170 landscape, screens170.*
+//   DISPLAY_VARIANT 1: 1.69" 240x280               -> 280x240 landscape, screens.*
+#if DISPLAY_VARIANT == 2
+#include "screens170.h"
+static const uint16_t INIT_W = 170, INIT_H = 320;   // native portrait size for init()
+static const uint16_t W = 320, H = 170;              // after DISP_ROTATION 1/3
+static Screens170 screens;
+#elif DISPLAY_VARIANT == 1
 #include "screens.h"
-
-// Display rev 3: the dashboard screens are drawn for 280x240 (the 1.69" MSP1691 in landscape).
-#if DISPLAY_VARIANT != 1
-#error "Display rev 3 screens are 280x240 only (DISPLAY_VARIANT 1). The 1.9\" variant needs its own layouts."
-#endif
-static const uint16_t INIT_W = 240, INIT_H = 280;   // native portrait size for init()
-static const uint16_t W = 280, H = 240;              // after DISP_ROTATION 1/3
-
-static Adafruit_ST7789 tft(PIN_DISP_CS, PIN_DISP_DC, -1);
-static BootSplash splash;
+static const uint16_t INIT_W = 240, INIT_H = 280;
+static const uint16_t W = 280, H = 240;
 static Screens screens;
+#else
+#error "DISPLAY_VARIANT must be 1 (1.69\" 280x240) or 2 (1.9\" 320x170)"
+#endif
+
+static Adafruit_ST7789 tft(PIN_DISP_CS, PIN_DISP_DC, PIN_DISP_RST);   // init() pulses RES (D47)
+static BootSplash splash;
 static UiData ui;
 static bool uiReady;
 static uint32_t lastValuesAt, lastReinitAt;
@@ -100,7 +108,11 @@ void displayInit() {
   applyOrientation();               // DISP_ROTATION 1/3 -> landscape W x H
   tft.fillScreen(ST77XX_BLACK);
   tft.cp437(true);
+#if DISPLAY_VARIANT == 2
+  screens.begin(&tft, "v" FW_VERSION);
+#else
   screens.begin(&tft, W, H, "v" FW_VERSION);
+#endif
   lastReinitAt = millis();
 #if BOOT_SPLASH
   splash.begin(&tft, W, H, pickSplash(), FW_VERSION, DISP_INVERT, lastReinitAt);
@@ -117,7 +129,7 @@ static void buildUi() {
   ui.mode = st.mode;
   ui.state = st.state == ST_IDLE ? (st.mode == MODE_OFF ? "OFF" : "SLEEP") : stateName(st.state);
   ui.no12v = st.state == ST_NO12V;
-  ui.sim = NTC_TRIMPOT_SIM;
+  ui.sim = SIM_ACTIVE;
   ui.rad = ntcT3.valid ? ntcT3.c : NAN;
   ui.loop = ntcT1.valid ? ntcT1.c : NAN;
   ui.valve = ntcT2.valid ? ntcT2.c : NAN;
@@ -165,7 +177,8 @@ void displayUpdate(uint32_t now) {
     }
     return;
   }
-  // Non-blocking re-init, one command per call. SWRESET keeps GRAM, so nothing needs redrawing.
+  // Non-blocking re-init (self-heal), one command per call, then a full redraw. SWRESET keeps GRAM, so the old
+  // picture stays up until the redraw replaces it.
   if (initStep >= 0) {
     if ((int32_t)(now - initWaitUntil) < 0) return;
     if (initStep < INIT_STEPS) {
@@ -176,6 +189,7 @@ void displayUpdate(uint32_t now) {
       applyOrientation();
       initStep = -1;
       lastReinitAt = now;
+      screens.redraw();             // and redraw everything: repairs any pixels the long cable corrupted
     }
     return;
   }
