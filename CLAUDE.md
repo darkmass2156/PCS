@@ -90,6 +90,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
   - SEN: IRLB8721 low-side, driving V1 (HIGH = energised = open).
 
 ## Pin map (rev 6b — authoritative)
+Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/controller_pinout_rev6b.md`.
 | Pin | Signal | Notes |
 |---|---|---|
 | A0 | S1 | P2 fuse sense, 47k/20k divider (12V ≈ 3.58 V) |

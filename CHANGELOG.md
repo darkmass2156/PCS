@@ -32,6 +32,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 ---
 
+## DOC — 2026-11-01
+- `docs/controller_pinout_rev6b.md` (Vlad): component → LG → ribbon → housing H1–H8 → Mega for every wire.
+  Checked against `config.h`: all pins match (buttons D30 / D32, RES D47, SHT30 D34 / D36, ...).
+
 ## FW 0.5.0, DISP rev 7, lite170 1.4, BENCH 1.7, HW rev 6b — 2026-11-01
 From Vlad's change note `docs/changes/hw_rev6b.md` (hardware rev 6b; logic rev 2 unchanged).
 AVR build of all 16 sketches (`tools/avr_build/build.sh all`): OK, 0 warnings; controller also built with

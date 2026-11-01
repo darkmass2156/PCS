@@ -8,6 +8,7 @@ Arduino Mega 2560 controller for the outdoor free-cooling branch of a watercoole
 | `CLAUDE.md` | Authoritative spec: hardware, pin map, control logic, safety, tunables |
 | `CHANGELOG.md` | Revision index and change history |
 | `docs/changes/` | Change notes (why a logic/hardware revision changed), e.g. `hw_rev6b.md` |
+| `docs/controller_pinout_rev6b.md` | Wiring, rev 6b: every component pin → LG hole → ribbon pin → housing → Mega pin |
 | `docs/schematics/` | Loop schematics, all revisions |
 | `docs/build_component_list_rev4b.xlsx` | BOM ("Rev 4b BOM" sheet = controller parts) |
 | `firmware/controller/` | Controller firmware (Arduino IDE 2, open `controller.ino`) |
