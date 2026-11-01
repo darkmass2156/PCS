@@ -36,6 +36,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ---
 
 
+
+## BENCH — 2026-11-01: `14_led_colors`
+- New sketch to map the status LED colours on the buttons: firmware colours with per-channel gains, raw mixer,
+  white balance (prints `LED_GAIN_*` lines), hue sweep. Bench: green and blue very dim, white shows purple.
 ## FW 0.5.3 — 2026-11-01
 - `?` adds a room SHT30 diagnostic: D34/D36 idle levels with the external pull-ups only, then an ACK probe of
   0x44 / 0x45 (status register + CRC) with the pins as wired and swapped, and the current room reading.

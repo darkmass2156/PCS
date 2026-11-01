@@ -395,6 +395,8 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
     log page with T/RH charts; serial `d` dumps CSV.
 14. `13_led_pins` — status LED wiring: D9 / D10 / D11 one at a time (printed), white, off; PWM fades; colour sample
     of both LED schemes.
+15. `14_led_colors` — LED colour map: COLORS (firmware colours, both schemes, with gains), MIX (raw R/G/B on the
+    buttons), GAIN (white balance, prints `LED_GAIN_R/G/B` defines), SWEEP (hue wheel). BTN1 long = next page.
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the
