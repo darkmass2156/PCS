@@ -188,6 +188,41 @@ static void shtUpdate(uint32_t now) {
   }
 }
 
+// '?' diagnostics for the room SHT30: idle levels with only the external pull-ups, then an ACK probe on
+// 0x44 / 0x45 with the pins as wired and swapped. Blocking for a few ms, called on '?' only.
+void sensorsRoomDiag() {
+  pinMode(PIN_SDA2, INPUT);
+  pinMode(PIN_SCL2, INPUT);
+  delayMicroseconds(200);
+  Serial.print(F("# ROOM SHT30 idle (ext pull-ups only): D")); Serial.print(PIN_SDA2);
+  Serial.print(digitalRead(PIN_SDA2) ? F(" HIGH  D") : F(" LOW  D")); Serial.print(PIN_SCL2);
+  Serial.println(digitalRead(PIN_SCL2) ? F(" HIGH") : F(" LOW"));
+  static const uint8_t CMD_STATUS[2] = {0xF3, 0x2D};
+  for (uint8_t swap = 0; swap < 2; swap++) {
+    uint8_t sda = swap ? PIN_SCL2 : PIN_SDA2, scl = swap ? PIN_SDA2 : PIN_SCL2;
+    SoftI2C b(sda, scl);
+    b.begin();
+    for (uint8_t a = 0x44; a <= 0x45; a++) {
+      Serial.print(F("#   SDA D")); Serial.print(sda); Serial.print(F(" SCL D")); Serial.print(scl);
+      Serial.print(F(" 0x")); Serial.print(a, HEX);
+      if (!b.write(a, CMD_STATUS, 2)) { Serial.println(F(" no ACK")); continue; }
+      delay(2);
+      uint8_t d[3];
+      bool ok = b.read(a, d, 3);
+      Serial.print(F(" ACK"));
+      if (ok) {
+        Serial.print(F(", status 0x")); Serial.print((d[0] << 8) | d[1], HEX);
+        Serial.print(crc8(d, 2) == d[2] ? F(" crc ok") : F(" CRC BAD"));
+      }
+      Serial.println();
+    }
+  }
+  bus2.begin();
+  Serial.print(F("#   room reading: ")); Serial.print(sht[SHT_R].t, 2); Serial.print(F(" C "));
+  Serial.print(sht[SHT_R].rh, 1); Serial.print(F(" %  errs ")); Serial.print(sht[SHT_R].errCount);
+  Serial.println(sht[SHT_R].valid ? F(" valid") : F(" INVALID"));
+}
+
 float dewPointMax(uint8_t &validCount, float &spread) {
   float mx = NAN, mn = NAN;
   validCount = 0;

@@ -368,7 +368,8 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
   (fuses/faults/alarms as hex bitmasks, see `control.h`).
 - Serial events (`#` lines): state / mode changes from boot; at the end of the boot grace (10 s) every active
   fault and alarm by name, then each one as it turns ON / off — to match the LED to a cause.
-- Serial input: `?` prints version, tunables, a status line (incl. I2C recoveries) and all active faults/alarms.
+- Serial input: `?` prints version, tunables, a status line (incl. I2C recoveries), the NTC inputs, a room SHT30
+  probe (D34/D36 idle levels, 0x44/0x45 ACK as wired and swapped) and all active faults/alarms.
 - Known: opening the COM port toggles DTR and resets the Mega (CH340 auto-reset) → safe boot, V2 re-park.
 
 ## Bench test order

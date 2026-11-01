@@ -24,6 +24,7 @@ extern uint16_t i2cRecoveries;   // Wire bus recoveries after a timeout (shown b
 
 void sensorsInit();
 void sensorsUpdate(uint32_t now);   // non-blocking, call every loop pass
+void sensorsRoomDiag();             // '?' only: SHT30 bus levels + 0x44/0x45 probe, pins as wired and swapped
 
 // Max of the valid dew points; returns NAN and count 0 if none.
 float dewPointMax(uint8_t &validCount, float &spread);

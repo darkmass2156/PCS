@@ -222,6 +222,7 @@ void loop() {
   while (Serial.available()) {
     if (Serial.read() == '?') {
       printStatus();
+      sensorsRoomDiag();
       reportEvents(true);
     }
   }
