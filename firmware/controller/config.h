@@ -114,6 +114,8 @@
 #define NTC_OFFSET_T3  0.0f
 #define NTC_ADC_SHORT  8        // ADC below this = probe shorted (~80 Ω), invalid at once
 #define NTC_ADC_OPEN   1015     // ADC above this = probe open / unplugged, invalid at once
+#define NTC_FLOAT_DELTA 40      // open-pin check: with the internal pull-up the pin reads > NTC_ADC_OPEN and rose more
+                                //   than this = floating (a connected node moves ~20 counts, ~65 without its 100 nF)
 #define NTC_MIN_C      -40.0f
 #define NTC_MAX_C      80.0f
 #define NTC_FAULT_MS   2000UL

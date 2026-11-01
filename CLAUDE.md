@@ -151,6 +151,9 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   - Failure modes: a short reads HOT (the dangerous direction); an open circuit reads cold.
   - Raw ADC < `NTC_ADC_SHORT` (8) or > `NTC_ADC_OPEN` (1015) = shorted / open: value invalid at once (shows "--"),
     the NTC fault still follows rule 5 (2 s).
+  - Open-pin check after every read: internal pull-up on for ~100 µs; a pin that then reads > 1015 and rose more than
+    `NTC_FLOAT_DELTA` (40) is floating (broken ribbon / housing between LG and Mega) and is treated as open. Without it
+    a floating pin returns a plausible fake temperature (bench 2026-11-01: T2 stuck at ~17.5 °C).
 - **Fuse sense**: compare against thresholds with hysteresis (see Tunables). Binary present/absent check.
 - **Tach**: open-collector, 10k pull-up to 5V, 2 pulses/rev.
 - **PWM**: Timer3, fast PWM mode 14, no prescaler, ICR3 = 639 → 25 kHz.
@@ -427,7 +430,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `SHT_WIRE_TIMEOUT_US` = 25000
-- NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C
+- NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C
 - `LONG_PRESS_MS` = 2000, `WDT_ENABLE` = 1
 - Bench build: `NTC_TRIMPOT_SIM` = 0, `SIM_T_MIN_C` = −30, `SIM_T_MAX_C` = 50, `SIM_SHORT_OHM` = 50,
   `SIM_FORCE_12V` = 0, `SIM_FAKE_P2_TACH` = 0, `SIM_FAKE_FAN_TACH` = 0

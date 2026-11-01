@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-01 | 0.5.2 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.2` |
 | 2026-11-01 | 0.5.1 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.1` |
 | 2026-11-01 | 0.5.0 + lite 1.4 | 7 | 1.7 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.0` |
 | 2026-10-28 | 0.4.9 + lite 1.3 | 6 | 1.6 | 2 | 4b + CS mod + SHT30, dividers 330/660 | rev11 | `fw-v0.4.9` |
@@ -32,6 +33,16 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 | 2026-10-17 | — | — | — | 1 | 4b + CS mod | rev10 | `logic-r1` |
 
 ---
+
+## FW 0.5.2, BENCH 1.8 — 2026-11-01
+AVR build OK, 0 warnings. Bench report: T2 (A4) read a steady ~17.5 °C whatever was plugged in; T3 (A3) read 17.6 °C
+with the probe that reads 25.9 °C on T1 (586 instead of ~503 counts: ~7.2k pull-up or ~3.7k in series on that path).
+
+### Added
+- NTC open-pin check (safety): after each read the internal pull-up is on for ~100 µs; a floating pin (no connection
+  from the LG node to the Mega) reads as open → "--" and, after 2 s, the NTC fault, instead of a plausible fake
+  temperature on what may be the control sensor. `?` prints PIN FLOATING. `NTC_FLOAT_DELTA` = 40.
+- `01_ntc` prints PIN FLOATING the same way.
 
 ## FW 0.5.1 — 2026-11-01
 AVR build OK, 0 warnings.

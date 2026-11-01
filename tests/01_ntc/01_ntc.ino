@@ -1,4 +1,6 @@
 // 01_ntc — T1 (A5), T2 (A4), T3 (A3). Prints adc, ohm, °C at 1 Hz.
+// PIN FLOATING = the Mega pin isn't connected to its LG node (ribbon / housing): the value would be a fake one.
+// Expected with a 10k probe at 25 °C: adc ~511, ~10000 ohm. Unplugged probe: OPEN (node pulled to 5V).
 //
 // Buttons:
 //   BTN1 short  ice-water point: average 60 s, print per-sensor offsets for config.h (assumes 0.0 °C)
@@ -25,6 +27,15 @@ float readAdc(uint8_t pin) {
   uint32_t s = 0;
   for (uint8_t i = 0; i < 16; i++) s += analogRead(pin);
   return s / 16.0f;
+}
+
+// Internal pull-up on for ~100 us: a floating pin jumps to ~1023, a real node (10k + 100 nF) barely moves.
+bool floatingPin(uint8_t pin, float adc) {
+  pinMode(pin, INPUT_PULLUP);
+  delayMicroseconds(100);
+  uint16_t probe = analogRead(pin);
+  pinMode(pin, INPUT);
+  return probe > 1015 && probe > adc + 40;
 }
 
 float adcToR(float adc) { return 10000.0f * adc / (1023.0f - adc); }
@@ -101,6 +112,7 @@ void loop() {
     float adc = readAdc(PINS[k]);
     Serial.print(NAMES[k]); Serial.print(' ');
     Serial.print(adc, 1); Serial.print(' ');
+    if (floatingPin(PINS[k], adc)) { Serial.print(F("PIN FLOATING   ")); continue; }
     if (adc < 1 || adc > 1022) { Serial.print(adc < 1 ? F("SHORT(reads hot)   ") : F("OPEN(reads cold)   ")); continue; }
     float r = adcToR(adc);
     Serial.print(r, 0); Serial.print(' ');

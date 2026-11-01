@@ -172,7 +172,8 @@ static void printStatus() {
     Serial.print(F(": adc ")); Serial.print(n[i]->adc, 1);
     Serial.print(F(" = ")); Serial.print(n[i]->adc < 1022.5f ? NTC_R_PULLUP * n[i]->adc / (1023.0f - n[i]->adc) : 1e9f, 0);
     Serial.print(F(" ohm -> ")); Serial.print(n[i]->c, 2);
-    Serial.println(n[i]->valid ? F(" C") : F(" C (invalid)"));
+    Serial.print(n[i]->valid ? F(" C") : F(" C (invalid)"));
+    Serial.println(n[i]->floating ? F("  PIN FLOATING: no connection from the LG node to the Mega pin") : F(""));
   }
 }
 

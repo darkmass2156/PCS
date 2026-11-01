@@ -47,7 +47,16 @@ static void ntcUpdate(uint32_t now) {
     uint16_t sum = 0;
     for (uint8_t i = 0; i < 4; i++) sum += analogRead(ch.pin);
     float adc = sum / 4.0f;
-    bool openShort = adc < NTC_ADC_SHORT || adc > NTC_ADC_OPEN;   // judged on the raw reading, not the filter
+    // Open-pin check. A pin cut off from its node (broken ribbon wire, loose housing) floats, and the ADC then
+    // returns what the previous channel left on its sample cap: a plausible, wrong temperature. With the internal
+    // pull-up (~35k) on for ~100 us a floating pin rises to ~1023, while the real node (10k pull-up + 100 nF on LG)
+    // moves only a few counts. The 100 ms until the next read lets the node settle again.
+    pinMode(ch.pin, INPUT_PULLUP);
+    delayMicroseconds(100);
+    uint16_t probe = analogRead(ch.pin);
+    pinMode(ch.pin, INPUT);
+    bool floating = probe > NTC_ADC_OPEN && probe > adc + NTC_FLOAT_DELTA;
+    bool openShort = floating || adc < NTC_ADC_SHORT || adc > NTC_ADC_OPEN;   // raw reading, not the filter
     if (!ch.primed || openShort) { ch.adcF = adc; ch.primed = !openShort; }   // restart the filter on recovery
     ch.adcF += (adc - ch.adcF) / 8.0f;  // ~0.8 s time constant at 10 Hz
     float c = openShort ? NAN : ntcToC(ch.adcF);
@@ -55,6 +64,7 @@ static void ntcUpdate(uint32_t now) {
     NtcReading &o = *ch.out;
     o.c = c;
     o.adc = ch.adcF;
+    o.floating = floating;
     o.inRange = !isnan(c) && c >= NTC_MIN_C && c <= NTC_MAX_C;
     if (o.inRange) ch.bad.clear();
     else ch.bad.hold(now);

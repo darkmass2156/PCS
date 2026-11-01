@@ -6,6 +6,7 @@ enum { SHT_A = 0, SHT_B = 1, SHT_R = 2, SHT_COUNT = 3 };
 struct NtcReading {
   float c;          // NAN when the ADC reads a short or open
   float adc;        // filtered ADC counts (raw while open / shorted), for '?' diagnostics
+  bool floating;    // the Mega pin isn't connected to the NTC node (broken ribbon / housing): invalid
   bool inRange;     // -40..80 right now
   bool valid;       // in range, or out of range for less than NTC_FAULT_MS
 };
