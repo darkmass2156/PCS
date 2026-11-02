@@ -432,7 +432,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   - `FEAS_OPEN_C` = 5.0, `FEAS_FORCE_C` = 1.0, `FEAS_FORCE_MS` = 120000, `T_OUT_SETTLE_MIN` = 10 (ASSUMED)
   - `SHT_RH_OFFSET_A` = +1.15, `SHT_RH_OFFSET_B` = −1.15, `SHT_RH_OFFSET_R` = 0 (% RH)
   - `DP_SPREAD_ALARM_C` = 2.0, `K_POT` = 25.0 W/°C (placeholder until the A/B calibration test)
-- V2 (bench 2026-11-02): `V2_T_OPEN_MS` = 5050, `V2_T_CLOSE_MS` = 5050 (ASSUMED = open), `V2_BACKLASH_MS` = 725,
+- V2 (bench 2026-11-02): `V2_T_OPEN_MS` = 5050, `V2_T_CLOSE_MS` = 5050 (measured, = open), `V2_BACKLASH_MS` = 725,
   `V2_DEAD_MS` = 1300, `V2_HALF_MS` = 3100, `V2_PARK_MS` = 10000, `V2_MIN_PULSE_MS` = 150,
   `V2_REVERSE_DEADTIME_MS` = 500, `V2_CTRL_PERIOD_MS` = 10000, `V2_KP_OPEN/CLOSE_MS_PER_C` = 100 / 200,
   `V2_MAX_OPEN/CLOSE_PULSE_MS` = 500 / 1500 (TBD on the loop), `V2_START_LIMIT_MIN` = 5,
@@ -453,7 +453,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
 - Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to
   2 MHz on any glitch); serial log of sensor validity (the `#` event lines)
-- TBD (bench): NTC Beta, V2 close travel (assumed = open) and gains on the loop, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT
+- TBD (bench): NTC Beta, V2 gains on the loop, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT
 - Confirm ASSUMED items: T_out definition, wake needs feasibility, Mode 3 degraded behaviour, fault order kept
   for faults, T1 backstop alarm-only with P2 off, fault latching, LED overlays (12V absent / fault)
 - Docs: BOM rev 4b sheet has no line for the SHT30 (already owned); RAM block is Bykski in the BOM and IceMan on the schematic.

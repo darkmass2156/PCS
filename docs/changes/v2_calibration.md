@@ -25,5 +25,9 @@ The model uses the stepped numbers since regulation moves in steps: t_full = 505
 - Start rate limit is counted from the edge.
 - Gains and max pulses scaled to the real travel (they were for a 30 s placeholder). Tune on the filled loop.
 
+## Close direction (same day)
+Sequenced from all ports open: play 726 ms, then 1300 + 1800 + 1950 ms, then it stops at bypass.
+Close travel = open travel = 5050 ms after the play (`V2_T_CLOSE_MS`, FW 0.6.1).
+
 ## Still open
-- Close travel assumed equal to open; flow characteristic f(θ) and the gains need `10_v2_calibration` on the loop.
+- Flow characteristic f(θ) and the gains need `10_v2_calibration` on the loop.

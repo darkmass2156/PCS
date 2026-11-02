@@ -70,7 +70,7 @@
 // Stepped from bypass after the play: 1300 ms dead zone (outdoor still shut), +1800 ms = 50 % mix,
 // +1950 ms = all ports open. One straight end-to-end run takes 6400 ms.
 #define V2_T_OPEN_MS           5050UL   // bypass -> all ports open, motion after the play (stepped)
-#define V2_T_CLOSE_MS          5050UL   // ASSUMED same as open
+#define V2_T_CLOSE_MS          5050UL   // all ports open -> bypass after the play (bench: same as open)
 #define V2_BACKLASH_MS         725UL    // play after a reversal before the ball moves
 #define V2_DEAD_MS             1300UL   // motion from bypass before the outdoor port starts to open
 #define V2_HALF_MS             3100UL   // motion from bypass to 50 % outdoor (both inlets half)

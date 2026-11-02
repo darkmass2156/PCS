@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-02 | 0.6.1 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.1` |
 | 2026-11-02 | 0.6.0 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.0` |
 | 2026-11-01 | 0.5.4 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.4` |
 | 2026-11-01 | 0.5.3 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.3` |
@@ -42,6 +43,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.6.1 — 2026-11-02
+- V2 close travel measured: play 726 ms + 1300 + 1800 + 1950 ms, same as open. `V2_T_CLOSE_MS` 5050 confirmed
+  (was ASSUMED); no value change.
 ## FW 0.6.0 — 2026-11-02: V2 calibrated
 - V2 tunables from the bench (`docs/changes/v2_calibration.md`): travel 5050 ms after a 725 ms play, dead zone
   1300 ms from bypass (edge 23.2°), park 10 s on VC. Direction confirmed (VO = outdoor, VC = bypass).
