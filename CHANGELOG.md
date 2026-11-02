@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-02 | 0.6.0 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.0` |
 | 2026-11-01 | 0.5.4 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.4` |
 | 2026-11-01 | 0.5.3 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.3` |
 | 2026-11-01 | 0.5.2 + lite 1.4 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.2` |
@@ -40,6 +41,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.6.0 — 2026-11-02: V2 calibrated
+- V2 tunables from the bench (`docs/changes/v2_calibration.md`): travel 5050 ms after a 725 ms play, dead zone
+  1300 ms from bypass (edge 23.2°), park 10 s on VC. Direction confirmed (VO = outdoor, VC = bypass).
+- Opens from below the edge cross the dead zone; regulation closes only to the edge; sleep counts time shut at the
+  edge. Start rate limit from the edge. Gains / max pulses scaled to the real travel (tune on the loop).
 ## BENCH — 2026-11-02: valve tests without fuse sense
 - `07_valve`, `10_v2_calibration`: `FUSE_CHECK 0` (default) no longer refuses to drive when S1/S3 read low; 1 restores
   the check. Bench: 12 V present on all fuses but S3 not seen on A2 (fuse-sense path open, to be traced).

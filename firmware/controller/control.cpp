@@ -152,7 +152,8 @@ static void openPulse(float err, uint32_t now) {
   if (ms < V2_MIN_PULSE_MS) ms = V2_MIN_PULSE_MS;
   uint32_t since = now - runStartAt;
   if (since < V2_START_LIMIT_MIN * 60000UL) {
-    float room = since / 60000.0f * V2_START_RATE_DEG_MIN - valveDeg();
+    float above = valveDeg() - V2_FLOW_DEG;   // the dead zone below the edge doesn't count
+    float room = since / 60000.0f * V2_START_RATE_DEG_MIN - (above > 0 ? above : 0);
     if (room <= 0) return;
     float roomMs = room / 90.0f * V2_T_OPEN_MS;
     if (roomMs < ms) ms = roomMs;
@@ -309,7 +310,7 @@ void controlUpdate(uint32_t now) {
         break;
       }
       regulate(now);
-      if (valveParked()) {
+      if (valveShut()) {                 // outdoor shut (at the edge or parked)
         parked.hold(now);
         if (parked.elapsed(now, SLEEP_PARK_MIN * 60000UL)) enter(ST_STOPPING, now);
       } else {

@@ -258,7 +258,7 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
   - θ = 90°, all-ports-open: maximum outdoor flow
   - θ = 0°, bypass-only: outdoor port blocked. This is the home end and the safe end.
 - V2 has no position feedback; θ is estimated from run time (see Valve).
-  ASSUMED: VO moves toward all-ports-open and VC toward bypass-only. **Verify on the bench.**
+  VO moves toward all-ports-open and VC toward bypass-only (confirmed on the bench 2026-11-02, `07_valve`).
 - Coolant freeze point is −25 °C.
 - The blue line and the V2 body sit indoors at outdoor-return temperature, which is a condensation risk inside the box.
 
@@ -294,7 +294,14 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 ### Valve V2 (floating control)
 - θ = θ₀ ± (90° / t_full,dir) × t_on, with separate open/close travel times.
 - Backlash: after a direction reversal, the first `V2_BACKLASH_MS` of motion doesn't move θ.
-- Clamp θ to 0–90°. Every move to bypass is a park: drive VC for t_full,close × 1.3, then θ = 0 (re-zero, homed).
+- Clamp θ to 0–90°. A park drives VC for `V2_PARK_MS` (10 s, the CR-02 autostops), then θ = 0 (re-zero, homed).
+  Every boot and every 12V return parks first, in every mode.
+- **Dead zone** (bench 2026-11-02): from bypass the first `V2_DEAD_MS` (1300 ms) of motion after the play doesn't
+  open the outdoor port. The edge is θ = 90 · 1300 / 5050 = 23.2° (`V2_FLOW_DEG`); 50 % outdoor at 3100 ms (55°),
+  all ports open at 5050 ms (90°). An open step from below the edge adds the time to cross the dead zone.
+  Regulation closes only down to the edge (outdoor shut, no park); parks are for start, stop/sleep, the hard low
+  limit, forced bypass and SAFE. Sleep counts time at or below the edge.
+  See `docs/changes/v2_calibration.md`.
 - Non-blocking step pulses every `V2_CTRL_PERIOD_MS`, length ∝ error, with a minimum pulse,
   a ±0.5 °C deadband and a dead time before reversing.
 - Close fast, open slow (separate gains and max pulse lengths).
@@ -425,9 +432,11 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   - `FEAS_OPEN_C` = 5.0, `FEAS_FORCE_C` = 1.0, `FEAS_FORCE_MS` = 120000, `T_OUT_SETTLE_MIN` = 10 (ASSUMED)
   - `SHT_RH_OFFSET_A` = +1.15, `SHT_RH_OFFSET_B` = −1.15, `SHT_RH_OFFSET_R` = 0 (% RH)
   - `DP_SPREAD_ALARM_C` = 2.0, `K_POT` = 25.0 W/°C (placeholder until the A/B calibration test)
-- V2: `V2_T_OPEN_MS` / `V2_T_CLOSE_MS` = 30000 placeholder (TBD), `V2_BACKLASH_MS` = 0 (TBD), `V2_HOME_OVERDRIVE` = 1.3,
-  `V2_MIN_PULSE_MS` = 150, `V2_REVERSE_DEADTIME_MS` = 500, `V2_CTRL_PERIOD_MS` = 10000,
-  gains/max pulses, `V2_START_LIMIT_MIN` = 5, `V2_START_RATE_DEG_MIN` = 5
+- V2 (bench 2026-11-02): `V2_T_OPEN_MS` = 5050, `V2_T_CLOSE_MS` = 5050 (ASSUMED = open), `V2_BACKLASH_MS` = 725,
+  `V2_DEAD_MS` = 1300, `V2_HALF_MS` = 3100, `V2_PARK_MS` = 10000, `V2_MIN_PULSE_MS` = 150,
+  `V2_REVERSE_DEADTIME_MS` = 500, `V2_CTRL_PERIOD_MS` = 10000, `V2_KP_OPEN/CLOSE_MS_PER_C` = 100 / 200,
+  `V2_MAX_OPEN/CLOSE_PULSE_MS` = 500 / 1500 (TBD on the loop), `V2_START_LIMIT_MIN` = 5,
+  `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
 - Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000
@@ -444,7 +453,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
 - Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to
   2 MHz on any glitch); serial log of sensor validity (the `#` event lines)
-- TBD (bench): NTC Beta, V2 direction + travel + backlash, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT
+- TBD (bench): NTC Beta, V2 close travel (assumed = open) and gains on the loop, δ, fan minimum / 0 % behaviour, P2 PWM direction, K_POT
 - Confirm ASSUMED items: T_out definition, wake needs feasibility, Mode 3 degraded behaviour, fault order kept
   for faults, T1 backstop alarm-only with P2 off, fault latching, LED overlays (12V absent / fault)
 - Docs: BOM rev 4b sheet has no line for the SHT30 (already owned); RAM block is Bykski in the BOM and IceMan on the schematic.

@@ -105,17 +105,23 @@ void valvePark() {
   if (parking || (pendPark && pendDir == V_CLOSE)) return;
   if (moving != V_NONE) halt(millis(), false);
   homed = false;
-  request(V_CLOSE, (uint32_t)(V2_T_CLOSE_MS * V2_HOME_OVERDRIVE) + V2_BACKLASH_MS, true);
+  request(V_CLOSE, V2_PARK_MS, true);
 }
+
+static const float EDGE_TOL_DEG = 0.5f;
 
 bool valveStep(ValveDir dir, uint32_t ms) {
   if (!powerOk || !homed || valveBusy() || dir == V_NONE) return false;
   if (ms < V2_MIN_PULSE_MS) ms = V2_MIN_PULSE_MS;
-  if (dir == V_CLOSE && deg - 90.0f * ms / V2_T_CLOSE_MS <= 0.0f) {
-    valvePark();             // every move to bypass overdrives and re-zeroes
-    return true;
+  if (dir == V_CLOSE) {
+    if (deg <= V2_FLOW_DEG + EDGE_TOL_DEG) return false;          // already shut to outdoor
+    float toEdge = (deg - V2_FLOW_DEG) / 90.0f * V2_T_CLOSE_MS;   // stop at the edge, not in the dead zone
+    if (ms > toEdge) ms = (uint32_t)toEdge;
+    if (ms < V2_MIN_PULSE_MS) ms = V2_MIN_PULSE_MS;
+  } else {
+    if (deg >= 90.0f) return false;
+    if (deg < V2_FLOW_DEG) ms += (uint32_t)((V2_FLOW_DEG - deg) / 90.0f * V2_T_OPEN_MS);  // cross the dead zone
   }
-  if (dir == V_OPEN && deg >= 90.0f) return false;
   request(dir, ms, false);
   return true;
 }
@@ -131,5 +137,6 @@ void valveStop() {
 bool valveBusy() { return moving != V_NONE || pendDir != V_NONE; }
 bool valveHomed() { return homed; }
 bool valveParked() { return homed && deg <= 0.0f && !valveBusy(); }
+bool valveShut() { return homed && deg <= V2_FLOW_DEG + EDGE_TOL_DEG && !valveBusy(); }
 float valveDeg() { return deg; }
 ValveDir valveMoving() { return moving; }
