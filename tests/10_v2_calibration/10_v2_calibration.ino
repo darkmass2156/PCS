@@ -19,6 +19,8 @@
 #include <Wire.h>
 #include "bench.h"
 
+#define FUSE_CHECK 0   // 1 = runs need S1/S3 (A0/A2) high; 0 (default) skips the fuse-sense checks
+
 // ---- copy these from firmware/controller/config.h ----
 const float NTC_BETA = 3435.0f;
 const float NTC_OFFSET_T1 = 0.0f, NTC_OFFSET_T2 = 0.0f, NTC_OFFSET_T3 = 0.0f;
@@ -48,7 +50,7 @@ uint32_t stopRun() {
 }
 
 bool startRun(int8_t d, uint32_t ms) {
-  if (analogRead(A2) < 500) { Serial.println(F("S3 low: no 12 V on the valve fuse")); benchBlink(255, 0, 0, 3); return false; }
+  if (FUSE_CHECK && analogRead(A2) < 500) { Serial.println(F("S3 low: no 12 V on the valve fuse")); benchBlink(255, 0, 0, 3); return false; }
   stopRun();
   if (lastDir && d != lastDir) while (millis() - stopAt < 500) {}   // reversal dead time
   dir = d;
@@ -214,7 +216,7 @@ void sweepAbort(const __FlashStringHelper *why) {
 }
 
 void sweepStart() {
-  if (analogRead(A0) < 500 || analogRead(A2) < 500) { Serial.println(F("S1/S3 low: no 12 V")); return; }
+  if (FUSE_CHECK && (analogRead(A0) < 500 || analogRead(A2) < 500)) { Serial.println(F("S1/S3 low: no 12 V")); return; }
   Serial.println(F("sweep: parking V2"));
   Serial.println(F("CAL,step,dir,theta_model,T1,T2,T3,f,DP,P2rpm"));
   startRun(-1, tCloseEst() * 13 / 10);
@@ -239,7 +241,7 @@ void sweepUpdate(uint32_t now) {
     float floor = isnan(dpLast) ? T2_FLOOR_C : (dpLast + 3 > T2_FLOOR_C ? dpLast + 3 : T2_FLOOR_C);
     if (isnan(t1) || isnan(t2) || isnan(t3)) { sweepAbort(F("NTC short/open")); return; }
     if (sw >= SW_PRIME && t2 < floor) { sweepAbort(F("T2 below floor (DP + 3 / T2_FLOOR_C)")); return; }
-    if (analogRead(A0) < 250 || analogRead(A2) < 250) { sweepAbort(F("12 V / fuse lost")); return; }
+    if (FUSE_CHECK && (analogRead(A0) < 250 || analogRead(A2) < 250)) { sweepAbort(F("12 V / fuse lost")); return; }
     if (sw >= SW_PRIME && now - pumpOnAt > 3000) {
       if (pumpRpm == 0) { if (!pumpZeroAt) pumpZeroAt = now; if (now - pumpZeroAt > 5000) { sweepAbort(F("P2 stall")); return; } }
       else pumpZeroAt = 0;

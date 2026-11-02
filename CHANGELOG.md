@@ -39,6 +39,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-02: valve tests without fuse sense
+- `07_valve`, `10_v2_calibration`: `FUSE_CHECK 0` (default) no longer refuses to drive when S1/S3 read low; 1 restores
+  the check. Bench: 12 V present on all fuses but S3 not seen on A2 (fuse-sense path open, to be traced).
+- Bench find: the VO driver had a BC557 (PNP) fitted instead of the BC547 (C-B junction held the gate at 0.8 V).
 ## FW 0.5.4 + lite 1.5 — 2026-11-01
 - Status LED (scheme 1): the alarm flash (100 ms yellow every 2 s) is removed (Vlad). Alarms show on the display
   and as `#` serial lines; the LED shows mode, fault and the mode-change pulses only.

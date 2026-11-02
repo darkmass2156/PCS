@@ -1,4 +1,4 @@
-// 07_valve — V2 CR-02: VO D22 (open), VC D24 (close), high-side via IRF4905. Needs 12 V (S3 checked).
+// 07_valve — V2 CR-02: VO D22 (open), VC D24 (close), high-side via IRF4905. Needs 12 V. FUSE_CHECK 1 refuses to move while S3 (A2) reads low; 0 (default) only prints it.
 // Quick checks: direction (VO toward ALL-PORTS-OPEN, VC toward BYPASS-ONLY), autostop at both ends,
 // interlock. For travel times, backlash and the θ equation use tests/10_v2_calibration.
 //
@@ -11,6 +11,8 @@
 // Interlock mirrors the firmware: one drive() function, 500 ms dead time before reversing.
 
 #include "bench.h"
+
+#define FUSE_CHECK 0   // 1 = refuse to move while S3 (A2) < 500
 
 const uint8_t VO = 22, VC = 24;
 int8_t dir;            // 1 open, -1 close, 0 stopped
@@ -25,7 +27,7 @@ void drive(int8_t d) {
   benchLed(0, d > 0 ? 120 : 0, d < 0 ? 120 : 0);
 }
 
-bool twelveVolt() { return analogRead(A2) >= 500; }
+bool twelveVolt() { return !FUSE_CHECK || analogRead(A2) >= 500; }
 
 void halt(const __FlashStringHelper *why) {
   drive(0);
