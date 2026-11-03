@@ -7,12 +7,26 @@
 //   BTN2 long   duty 0 %
 // Serial: f<pct> fixed duty, s sweep.
 // LED: brightness follows the duty.
+// Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2 (edge must still be LOW ~3 us later and
+// >= TACH_LOCKOUT_US after the last counted one). Raw >> filtered = PWM noise coupling onto the tach lines.
+// iPPC-3000: ~3000 rpm max = 100 Hz falling edges (10 ms apart), so the 3 ms lockout never drops a real pulse.
 
 #include "bench.h"
 
-volatile uint16_t p1, p2;
-void isr1() { p1++; }
-void isr2() { p2++; }
+const uint16_t TACH_LOCKOUT_US = 3000;
+volatile uint16_t p1, p2, f1, f2;
+volatile uint32_t last1, last2;
+// D18 = PD3 (INT3), D19 = PD2 (INT2)
+void isr1() {
+  p1++;
+  uint32_t t = micros();
+  if (!(PIND & _BV(PD3)) && t - last1 >= TACH_LOCKOUT_US) { f1++; last1 = t; }
+}
+void isr2() {
+  p2++;
+  uint32_t t = micros();
+  if (!(PIND & _BV(PD2)) && t - last2 >= TACH_LOCKOUT_US) { f2++; last2 = t; }
+}
 
 uint8_t duty;
 bool sweep;
@@ -37,7 +51,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(19), isr2, FALLING);
   Serial.begin(115200);
   benchBanner(F("05_fan_pwm_tach"));
-  Serial.println(F("BTN1/BTN2 short: +/-10 % | BTN1 long: sweep | BTN2 long: 0 %   columns: duty rpm1 rpm2"));
+  Serial.println(F("BTN1/BTN2 short: +/-10 % | BTN1 long: sweep | BTN2 long: 0 %"));
+  Serial.println(F("columns: duty | raw rpm1 rpm2 | filtered rpm1 rpm2"));
   benchButtonsBegin();
   setDuty(0);
 }
@@ -67,10 +82,12 @@ void loop() {
   uint32_t dt = millis() - last;
   last = millis();
   noInterrupts();
-  uint16_t a = p1, b = p2;
-  p1 = p2 = 0;
+  uint16_t a = p1, b = p2, fa = f1, fb = f2;
+  p1 = p2 = f1 = f2 = 0;
   interrupts();
-  Serial.print(duty); Serial.print(F("% "));
+  Serial.print(duty); Serial.print(F("% | raw "));
   Serial.print(a * 30000UL / dt); Serial.print(' ');
-  Serial.println(b * 30000UL / dt);
+  Serial.print(b * 30000UL / dt); Serial.print(F(" | filtered "));
+  Serial.print(fa * 30000UL / dt); Serial.print(' ');
+  Serial.println(fb * 30000UL / dt);
 }

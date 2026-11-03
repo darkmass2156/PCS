@@ -54,6 +54,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-04: `05_fan_pwm_tach` raw vs filtered tach
+- Prints raw rpm (every falling edge) next to filtered rpm (edge still LOW when the ISR reads it, 3 ms lockout) to
+  show PWM noise coupling onto the tach lines (bench: tach readings far off).
 ## BENCH — 2026-11-03: averaged SHT calibration in `02_sht31_dewpoint`
 - BTN1 long: 10 min run averaging the raw T/RH of A, B and R, then prints each sensor's offset to the median of the
   three as `#define SHT_T_OFFSET_*` / `SHT_RH_OFFSET_*`. The breath marker moved to serial `b`.
