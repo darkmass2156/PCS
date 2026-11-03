@@ -34,24 +34,8 @@ volatile uint32_t min1 = 0xFFFFFFFF, max1, min2 = 0xFFFFFFFF, max2;   // interva
 void isr1() { p1++; }
 void isr2() { p2++; }
 
-struct Deb { bool high; uint8_t n; };
-Deb d1 = {true, 0}, d2 = {true, 0};
-// true on a debounced HIGH -> LOW change
-inline bool debounce(Deb &d, bool high) {
-  if (high == d.high) { d.n = 0; return false; }
-  if (++d.n < TACH_DEBOUNCE) return false;
-  d.high = high;
-  d.n = 0;
-  return !high;
-}
-inline void counted(uint32_t t, volatile uint32_t &last, volatile uint32_t &mn, volatile uint32_t &mx,
-                    volatile uint16_t &f) {
-  uint32_t iv = t - last;
-  if (iv < mn) mn = iv;
-  if (iv > mx) mx = iv;
-  last = t;
-  f++;
-}
+#include "tach_deb.h"   // in a header: the IDE's prototype generator breaks struct-typed functions in the .ino
+
 ISR(TIMER4_COMPA_vect) {
   uint32_t t = micros();
   if (debounce(d1, PIND & _BV(PD3))) counted(t, last1, min1, max1, f1);   // D18
