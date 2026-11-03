@@ -160,7 +160,9 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 - **Tach**: open-collector, 2 pulses/rev. Fans: internal pull-up (wired straight to the Mega), planned 10k to 5V +
   10 nF to GND at the Mega pins and 1k in series in FAN_PWM (bench 2026-11-04: the 25 kHz PWM couples onto the tach
   in the fan cables, ~25k edges/s). P2: 10k on LG. Edge filter in the ISRs: counts only if the pin is still LOW and
-  `TACH_LOCKOUT_US` (3 ms) after the last counted edge (3000 rpm = 10 ms, D5 ~4800 rpm = 12.5 ms).
+  `TACH_LOCKOUT_US` (3 ms) after the last counted edge, and the line was HIGH ≥ `TACH_HIGH_MIN_US` (1 ms) before it
+  (CHANGE interrupts; 3000 rpm = 10 ms period, D5 ~4800 rpm = 12.5 ms). Fitted 2026-11-04: 10k + 100 nF at D18/D19,
+  1k in FAN_PWM.
 - **PWM**: Timer3, fast PWM mode 14, no prescaler, ICR3 = 639 → 25 kHz.
   - 0 % disconnects the compare output and holds the pin LOW (OCR = 0 still gives a 62 ns spike).
   - Use no libraries that take Timer3. Leave Timer1 and Timer2 alone (they drive the LED).
@@ -460,7 +462,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
-- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_LOCKOUT_US` = 3000
+- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_LOCKOUT_US` = 3000, `TACH_HIGH_MIN_US` = 1000
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C

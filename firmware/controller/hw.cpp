@@ -63,24 +63,21 @@ uint8_t hwPumpPct() { return pumpPct; }
 // Tach edge filter (bench 2026-11-04: the 25 kHz fan PWM couples onto the tach lines in the fan cables): an edge
 // counts only if the pin is still LOW when the ISR reads it and TACH_LOCKOUT_US have passed since the last one.
 // 3000 rpm at 2 pulses/rev = 10 ms between falling edges, so the 3 ms lockout never drops a real pulse.
-static uint32_t lastF1, lastF2, lastP;
-static void isrTach1() {   // D18 = PD3
-  uint32_t t = micros();
-  if (!(PIND & _BV(PD3)) && t - lastF1 >= TACH_LOCKOUT_US) { pulsesF1++; lastF1 = t; }
+// Also the line must have been HIGH for TACH_HIGH_MIN_US before the falling edge: a glitch on a slow (RC-filtered)
+// transition has almost no HIGH time before it, a real pulse >= 5 ms (bench: without this the count doubled > 1000 rpm).
+static uint32_t lastF1, lastF2, lastP, riseF1, riseF2, riseP;
+static inline void tachEdge(bool high, uint32_t t, uint32_t &rise, uint32_t &last, volatile uint16_t &n) {
+  if (high) { rise = t; return; }
+  if (t - rise >= TACH_HIGH_MIN_US && t - last >= TACH_LOCKOUT_US) { n++; last = t; }
 }
-static void isrTach2() {   // D19 = PD2
-  uint32_t t = micros();
-  if (!(PIND & _BV(PD2)) && t - lastF2 >= TACH_LOCKOUT_US) { pulsesF2++; lastF2 = t; }
-}
+static void isrTach1() { tachEdge(PIND & _BV(PD3), micros(), riseF1, lastF1, pulsesF1); }   // D18 = PD3
+static void isrTach2() { tachEdge(PIND & _BV(PD2), micros(), riseF2, lastF2, pulsesF2); }   // D19 = PD2
 
-// D12 = PB6 = PCINT6. Count falling edges only, same filter.
+// D12 = PB6 = PCINT6 (fires on any change in the group).
 ISR(PCINT0_vect) {
   static uint8_t prev = _BV(PB6);
   uint8_t now = PINB & _BV(PB6);
-  if (prev && !now) {
-    uint32_t t = micros();
-    if (t - lastP >= TACH_LOCKOUT_US) { pulsesP++; lastP = t; }
-  }
+  if (now != prev) tachEdge(now, micros(), riseP, lastP, pulsesP);
   prev = now;
 }
 
@@ -92,8 +89,8 @@ void hwInit() {
   pinMode(PIN_TACH1, INPUT_PULLUP);   // fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04), no LG 10k:
   pinMode(PIN_TACH2, INPUT_PULLUP);   // internal ~35k pull-up (an external 10k at the Mega end is still welcome)
   pinMode(PIN_PUMP_TACH, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIN_TACH1), isrTach1, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PIN_TACH2), isrTach2, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_TACH1), isrTach1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_TACH2), isrTach2, CHANGE);
   PCMSK0 = _BV(PCINT6);
   PCIFR = _BV(PCIF0);
   PCICR |= _BV(PCIE0);

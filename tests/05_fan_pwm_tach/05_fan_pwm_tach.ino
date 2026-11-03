@@ -7,25 +7,28 @@
 //   BTN2 long   duty 0 %
 // Serial: f<pct> fixed duty, s sweep.
 // LED: brightness follows the duty.
-// Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2 (edge must still be LOW ~3 us later and
-// >= TACH_LOCKOUT_US after the last counted one). Raw >> filtered = PWM noise coupling onto the tach lines.
+// Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2: a falling edge counts only if the pin is
+// still LOW in the ISR, the line was HIGH for >= TACH_HIGH_MIN_US before it, and >= TACH_LOCKOUT_US have passed since
+// the last counted one. Raw >> filtered = noise / glitches on the tach lines.
 // iPPC-3000: ~3000 rpm max = 100 Hz falling edges (10 ms apart), so the 3 ms lockout never drops a real pulse.
 
 #include "bench.h"
 
-const uint16_t TACH_LOCKOUT_US = 3000;
+const uint16_t TACH_LOCKOUT_US = 3000, TACH_HIGH_MIN_US = 1000;
 volatile uint16_t p1, p2, f1, f2;
-volatile uint32_t last1, last2;
-// D18 = PD3 (INT3), D19 = PD2 (INT2)
+volatile uint32_t last1, last2, rise1, rise2;
+// D18 = PD3 (INT3), D19 = PD2 (INT2); interrupts on CHANGE
 void isr1() {
-  p1++;
   uint32_t t = micros();
-  if (!(PIND & _BV(PD3)) && t - last1 >= TACH_LOCKOUT_US) { f1++; last1 = t; }
+  if (PIND & _BV(PD3)) { rise1 = t; return; }
+  p1++;
+  if (t - rise1 >= TACH_HIGH_MIN_US && t - last1 >= TACH_LOCKOUT_US) { f1++; last1 = t; }
 }
 void isr2() {
-  p2++;
   uint32_t t = micros();
-  if (!(PIND & _BV(PD2)) && t - last2 >= TACH_LOCKOUT_US) { f2++; last2 = t; }
+  if (PIND & _BV(PD2)) { rise2 = t; return; }
+  p2++;
+  if (t - rise2 >= TACH_HIGH_MIN_US && t - last2 >= TACH_LOCKOUT_US) { f2++; last2 = t; }
 }
 
 uint8_t duty;
@@ -45,10 +48,10 @@ void setup() {
   TCCR3A = _BV(WGM31);
   TCCR3B = _BV(WGM33) | _BV(WGM32) | _BV(CS30);
   ICR3 = 639;
-  pinMode(18, INPUT_PULLUP);   // internal ~35k: the tach lines run straight PW -> Mega since 2026-11-04 (no LG 10k)
+  pinMode(18, INPUT_PULLUP);   // straight PW -> Mega since 2026-11-04: external 10k + 100 nF at the Mega, internal on too
   pinMode(19, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(18), isr1, FALLING);
-  attachInterrupt(digitalPinToInterrupt(19), isr2, FALLING);
+  attachInterrupt(digitalPinToInterrupt(18), isr1, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(19), isr2, CHANGE);
   Serial.begin(115200);
   benchBanner(F("05_fan_pwm_tach"));
   Serial.println(F("BTN1/BTN2 short: +/-10 % | BTN1 long: sweep | BTN2 long: 0 %"));

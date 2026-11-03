@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.8.4 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct + RC | rev11 | `fw-v0.8.4` |
 | 2026-11-04 | 0.8.3 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.3` |
 | 2026-11-04 | 0.8.2 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.2` |
 | 2026-11-03 | 0.8.1 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.1` |
@@ -59,6 +60,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.8.4 — 2026-11-04
+- Tach filter also needs the line HIGH ≥ 1 ms before a counted falling edge (`TACH_HIGH_MIN_US`, CHANGE interrupts).
+  Bench after 10k + 100 nF: fan 2 read exactly double above ~1000 rpm (glitch on the slow rising edge counted).
+  Same filter in `05_fan_pwm_tach`. Fan 1: intermittent contact to FAN_PWM (750k bursts), hardware.
 ## FW 0.8.3 — 2026-11-04
 - Tach edge filter in all three ISRs (fans, P2): pin still LOW + 3 ms lockout (`TACH_LOCKOUT_US`), as in `05`.
   Bench: raw 750k rpm at 10 % = every PWM cycle coupled onto both fan tachs; hardware RC (10k + 10 nF at D18/D19,

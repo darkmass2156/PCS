@@ -97,6 +97,7 @@
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
 #define TACH_LOCKOUT_US  3000UL   // tach edge filter: min time between counted edges (3000 rpm = 10 ms)
+#define TACH_HIGH_MIN_US 1000UL   // ... and the line HIGH at least this long before a counted falling edge
 #define FAN_STALL_MS     5000UL
 
 // ---------------- Fuse sense / 12V ----------------
