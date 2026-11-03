@@ -153,9 +153,14 @@
 #define SHT_WIRE_TIMEOUT_US 25000UL   // rev 6b: Wire timeout; after one, the bus is recovered (9 SCL pulses)
 // RH calibration offsets, added to the reading (% RH), corrected RH clamped to 0..100.
 // A/B from a side-by-side run (2026-10-28): A read low, B high.
-#define SHT_RH_OFFSET_A  1.15f   // SHT31 A 0x44
-#define SHT_RH_OFFSET_B -1.15f   // SHT31 B 0x45
-#define SHT_RH_OFFSET_R  0.0f    // SHT30 room
+// Calibration 2026-11-03: all three side by side, raw readings pulled to the median of the three
+// (A 21.45 °C 33.5 %, B 22.51 °C 34.8 %, R 22.64 °C 35.0 % -> median 22.51 °C 34.8 %).
+#define SHT_RH_OFFSET_A  1.3f    // SHT31 A 0x44, % RH
+#define SHT_RH_OFFSET_B  0.0f    // SHT31 B 0x45 (the median)
+#define SHT_RH_OFFSET_R -0.2f    // SHT30 room
+#define SHT_T_OFFSET_A   1.06f   // °C
+#define SHT_T_OFFSET_B   0.0f
+#define SHT_T_OFFSET_R  -0.13f
 
 // ---------------- Misc ----------------
 #define LONG_PRESS_MS   2000UL

@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-03 | 0.8.1 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.1` |
 | 2026-11-03 | 0.8.0 + lite 1.6 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.0` |
 | 2026-11-03 | 0.7.1 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.1` |
 | 2026-11-03 | 0.7.0 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.0` |
@@ -51,6 +52,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.8.1 + lite 1.7 — 2026-11-03: SHT calibration to the median
+- All three SHTs side by side, raw: A 21.45 °C 33.5 %, B 22.51 °C 34.8 %, R 22.64 °C 35.0 %. Each pulled to the median
+  (22.51 °C, 34.8 %): A +1.06 °C / +1.3 % RH, B 0 / 0, R −0.13 °C / −0.2 % RH. New `SHT_T_OFFSET_*` (temperature was
+  not calibrated before). Same in lite170, 02, 10 and 12. Room SHT30 on D38/D40 confirmed reading.
 ## BENCH — 2026-11-03: `02_sht31_dewpoint` soft-bus scan
 - At boot and on BTN2 long: D38/D40 idle levels with the module pull-ups only, and an address scan 0x08..0x77 as wired
   and swapped (finds an SHT3x on 0x45, or a different chip sold as SHT30: 0x40 SHT2x/HTU21, 0x38 AHT).

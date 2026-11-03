@@ -17,9 +17,11 @@
 
 SoftI2C bus2(38, 40);   // SHT30 straight on the Mega header (FW 0.7.1)
 
-// RH calibration offsets (% RH, as config.h SHT_RH_OFFSET_*): A read low, B high. Set 0 to see raw readings.
-struct Dev { const char *name; uint8_t addr; bool soft; float rhOfs; uint16_t nack, crc; };
-Dev devs[3] = {{"A 0x44", 0x44, false, 1.15f, 0, 0}, {"B 0x45", 0x45, false, -1.15f, 0, 0}, {"R soft", 0x44, true, 0.0f, 0, 0}};
+// Calibration offsets, as config.h SHT_T_OFFSET_* (°C) and SHT_RH_OFFSET_* (% RH): each sensor pulled to the median of
+// the three (2026-11-03). Set them all to 0 to see raw readings.
+struct Dev { const char *name; uint8_t addr; bool soft; float tOfs, rhOfs; uint16_t nack, crc; };
+Dev devs[3] = {{"A 0x44", 0x44, false, 1.06f, 1.3f, 0, 0}, {"B 0x45", 0x45, false, 0.0f, 0.0f, 0, 0},
+               {"R soft", 0x44, true, -0.13f, -0.2f, 0, 0}};
 uint16_t periodMs = 2000;
 
 uint8_t crc8(const uint8_t *d, uint8_t n) {
@@ -65,7 +67,7 @@ void readAll() {
     if (!trig[i] || !fetch(d, b)) { d.nack++; Serial.print(F("NACK")); }
     else if (crc8(b, 2) != b[2] || crc8(b + 3, 2) != b[5]) { d.crc++; Serial.print(F("CRC FAIL")); }
     else {
-      float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
+      float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f + d.tOfs;
       float rh = constrain(100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f + d.rhOfs, 0.0f, 100.0f);
       float dp = dewPoint(t, rh);
       Serial.print(t, 2); Serial.print(F(" C ")); Serial.print(rh, 1); Serial.print(F(" % DP "));

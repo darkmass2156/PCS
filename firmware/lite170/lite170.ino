@@ -23,7 +23,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.6"
+#define LITE_VERSION "lite 1.7"
 #define TFT_RST 47          // rev 6b: RES on D47 through C5 pin 3 (680 Ω to GND on LG, so -1 = black screen)
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -31,8 +31,10 @@
 #define DISP_ROTATION 1     // 3 = landscape upside down
 #define BOOT_SPLASH 1
 #define DISP_REINIT_MS 300000UL
-#define SHT_RH_OFFSET_A  1.15f  // RH calibration (% RH, as config.h): A 0x44 read low
-#define SHT_RH_OFFSET_B -1.15f  // B 0x45 read high
+#define SHT_RH_OFFSET_A  1.3f   // calibration as config.h (2026-11-03, median of three): % RH
+#define SHT_RH_OFFSET_B  0.0f
+#define SHT_T_OFFSET_A   1.06f  // °C
+#define SHT_T_OFFSET_B   0.0f
 const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);
@@ -113,7 +115,7 @@ void fetch(Sht &s, bool trig) {
   }
   float t = 0, rh = 0;
   if (ok) {
-    t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
+    t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f + (s.addr == 0x44 ? SHT_T_OFFSET_A : SHT_T_OFFSET_B);
     rh = constrain(100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f + s.rhOfs, 0.0f, 100.0f);
     ok = t > -40 && t < 85 && rh > 0.5f && rh <= 100;   // plausible
   }
