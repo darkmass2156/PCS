@@ -60,14 +60,27 @@ bool hwV1Open() { return V1_FITTED ? hwSen() : true; }   // without V1 nothing b
 uint8_t hwFanPct() { return fanPct; }
 uint8_t hwPumpPct() { return pumpPct; }
 
-static void isrTach1() { pulsesF1++; }
-static void isrTach2() { pulsesF2++; }
+// Tach edge filter (bench 2026-11-04: the 25 kHz fan PWM couples onto the tach lines in the fan cables): an edge
+// counts only if the pin is still LOW when the ISR reads it and TACH_LOCKOUT_US have passed since the last one.
+// 3000 rpm at 2 pulses/rev = 10 ms between falling edges, so the 3 ms lockout never drops a real pulse.
+static uint32_t lastF1, lastF2, lastP;
+static void isrTach1() {   // D18 = PD3
+  uint32_t t = micros();
+  if (!(PIND & _BV(PD3)) && t - lastF1 >= TACH_LOCKOUT_US) { pulsesF1++; lastF1 = t; }
+}
+static void isrTach2() {   // D19 = PD2
+  uint32_t t = micros();
+  if (!(PIND & _BV(PD2)) && t - lastF2 >= TACH_LOCKOUT_US) { pulsesF2++; lastF2 = t; }
+}
 
-// D12 = PB6 = PCINT6. Count falling edges only.
+// D12 = PB6 = PCINT6. Count falling edges only, same filter.
 ISR(PCINT0_vect) {
   static uint8_t prev = _BV(PB6);
   uint8_t now = PINB & _BV(PB6);
-  if (prev && !now) pulsesP++;
+  if (prev && !now) {
+    uint32_t t = micros();
+    if (t - lastP >= TACH_LOCKOUT_US) { pulsesP++; lastP = t; }
+  }
   prev = now;
 }
 

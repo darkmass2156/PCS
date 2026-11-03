@@ -96,6 +96,7 @@
 #define FAN_PWM_MIN      20       // TBD: 05_fan_pwm_tach
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
+#define TACH_LOCKOUT_US  3000UL   // tach edge filter: min time between counted edges (3000 rpm = 10 ms)
 #define FAN_STALL_MS     5000UL
 
 // ---------------- Fuse sense / 12V ----------------

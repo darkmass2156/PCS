@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.8.3 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.3` |
 | 2026-11-04 | 0.8.2 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.2` |
 | 2026-11-03 | 0.8.1 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.1` |
 | 2026-11-03 | 0.8.0 + lite 1.6 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.0` |
@@ -57,6 +58,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.8.3 — 2026-11-04
+- Tach edge filter in all three ISRs (fans, P2): pin still LOW + 3 ms lockout (`TACH_LOCKOUT_US`), as in `05`.
+  Bench: raw 750k rpm at 10 % = every PWM cycle coupled onto both fan tachs; hardware RC (10k + 10 nF at D18/D19,
+  1k series in FAN_PWM) to follow.
 ## FW 0.8.2 — 2026-11-04
 - Fan tachs rewired straight PW C22/D22 → Mega D18/D19 (bypassing LG and its 10k pull-ups J7/J8): D18/D19 now
   `INPUT_PULLUP`, also in `05_fan_pwm_tach`. Bench: TACH2 picked up the 25 kHz fan PWM on the LG path.
