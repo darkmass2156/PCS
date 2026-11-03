@@ -65,7 +65,10 @@ uint8_t hwPumpPct() { return pumpPct; }
 // 3000 rpm at 2 pulses/rev = 10 ms between falling edges, so the 3 ms lockout never drops a real pulse.
 // Also the line must have been HIGH for TACH_HIGH_MIN_US before the falling edge: a glitch on a slow (RC-filtered)
 // transition has almost no HIGH time before it, a real pulse >= 5 ms (bench: without this the count doubled > 1000 rpm).
-static uint32_t lastF1, lastF2, lastP, riseF1, riseF2, riseP;
+static uint32_t lastF2, lastP, riseF2, riseP;
+#if FAN1_TACH_FITTED
+static uint32_t lastF1, riseF1;
+#endif
 static inline void tachEdge(bool high, uint32_t t, uint32_t &rise, uint32_t &last, volatile uint16_t &n) {
   if (high) { rise = t; return; }
   if (t - rise >= TACH_HIGH_MIN_US && t - last >= TACH_LOCKOUT_US) { n++; last = t; }
