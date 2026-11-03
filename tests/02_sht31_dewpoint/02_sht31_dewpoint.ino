@@ -6,7 +6,10 @@
 // Buttons:
 //   BTN1 short  reset error counters
 //   BTN2 short  toggle read rate 2 s / 0.5 s (0.5 s stresses the long bus)
-//   BTN1 long   breath test marker: prints "--- breathe on a sensor now ---" (DP of that one should jump)
+//   BTN1 long   calibration run: averages the RAW T/RH of all three for CAL_S (10 min, 2 s reads), then prints
+//               each sensor's offset to the median of the three averages as #define lines for config.h.
+//               LED blue while averaging. Any button aborts. Sensors close together, settled 15 min, no airflow.
+// Serial: b = breath test marker ("--- breathe on a sensor now ---", the DP of that one should jump).
 //   BTN2 long   soft-bus scan (also at boot): D38/D40 idle levels, every address 0x08..0x77 as wired and swapped
 // LED: green flash per read with all valid, yellow if one missing, red if none.
 
@@ -23,6 +26,12 @@ struct Dev { const char *name; uint8_t addr; bool soft; float tOfs, rhOfs; uint1
 Dev devs[3] = {{"A 0x44", 0x44, false, 1.06f, 1.3f, 0, 0}, {"B 0x45", 0x45, false, 0.0f, 0.0f, 0, 0},
                {"R soft", 0x44, true, -0.13f, -0.2f, 0, 0}};
 uint16_t periodMs = 2000;
+
+const uint32_t CAL_S = 600;
+bool calOn;
+uint32_t calStart;
+float calT[3], calRH[3];
+uint16_t calN[3];
 
 uint8_t crc8(const uint8_t *d, uint8_t n) {
   uint8_t crc = 0xFF;
@@ -67,8 +76,11 @@ void readAll() {
     if (!trig[i] || !fetch(d, b)) { d.nack++; Serial.print(F("NACK")); }
     else if (crc8(b, 2) != b[2] || crc8(b + 3, 2) != b[5]) { d.crc++; Serial.print(F("CRC FAIL")); }
     else {
-      float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f + d.tOfs;
-      float rh = constrain(100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f + d.rhOfs, 0.0f, 100.0f);
+      float tRaw = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f;
+      float rhRaw = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
+      if (calOn) { calT[i] += tRaw; calRH[i] += rhRaw; calN[i]++; }
+      float t = tRaw + d.tOfs;
+      float rh = constrain(rhRaw + d.rhOfs, 0.0f, 100.0f);
       float dp = dewPoint(t, rh);
       Serial.print(t, 2); Serial.print(F(" C ")); Serial.print(rh, 1); Serial.print(F(" % DP "));
       Serial.print(dp, 2);
@@ -84,7 +96,53 @@ void readAll() {
   Serial.println();
   if (valid == 3) benchLed(0, 60, 0); else if (valid) benchLed(120, 70, 0); else benchLed(150, 0, 0);
   delay(40);
+  benchLed(0, 0, calOn ? 60 : 0);
+}
+
+float median(float *v, uint8_t n) {   // n <= 3
+  if (n == 1) return v[0];
+  if (n == 2) return (v[0] + v[1]) / 2;
+  float a = v[0], b = v[1], c = v[2];
+  return max(min(a, b), min(max(a, b), c));
+}
+
+void calStartRun() {
+  for (uint8_t i = 0; i < 3; i++) { calT[i] = calRH[i] = 0; calN[i] = 0; }
+  calOn = true;
+  calStart = millis();
+  periodMs = 2000;
+  Serial.print(F("--- calibration: averaging raw T/RH for ")); Serial.print(CAL_S);
+  Serial.println(F(" s, don't touch or breathe near the sensors (any button aborts) ---"));
+}
+
+void calFinish() {
+  calOn = false;
   benchLed(0, 0, 0);
+  float mt[3], mrh[3], vt[3], vrh[3];
+  uint8_t n = 0;
+  Serial.println(F("--- calibration result (raw averages) ---"));
+  for (uint8_t i = 0; i < 3; i++) {
+    Serial.print(devs[i].name); Serial.print(F(": "));
+    if (calN[i] < 10) { Serial.println(F("too few reads, left out")); continue; }
+    mt[i] = calT[i] / calN[i];
+    mrh[i] = calRH[i] / calN[i];
+    vt[n] = mt[i]; vrh[n] = mrh[i]; n++;
+    Serial.print(mt[i], 3); Serial.print(F(" C ")); Serial.print(mrh[i], 2); Serial.print(F(" % over "));
+    Serial.print(calN[i]); Serial.println(F(" reads"));
+  }
+  if (n < 2) { Serial.println(F("need at least two sensors")); benchBlink(255, 0, 0, 3); return; }
+  float medT = median(vt, n), medRH = median(vrh, n);
+  Serial.print(F("median ")); Serial.print(medT, 3); Serial.print(F(" C ")); Serial.print(medRH, 2); Serial.println(F(" %"));
+  const char sfx[3] = {'A', 'B', 'R'};
+  Serial.println(F("// paste into config.h (and tell Claude):"));
+  for (uint8_t i = 0; i < 3; i++) {
+    if (calN[i] < 10) continue;
+    Serial.print(F("#define SHT_T_OFFSET_")); Serial.print(sfx[i]); Serial.print(' ');
+    Serial.print(medT - mt[i], 2); Serial.println('f');
+    Serial.print(F("#define SHT_RH_OFFSET_")); Serial.print(sfx[i]); Serial.print(' ');
+    Serial.print(medRH - mrh[i], 2); Serial.println('f');
+  }
+  benchBlink(0, 255, 0, 3);
 }
 
 // Room-sensor bus check: idle levels with only the module's pull-ups, then every 7-bit address, pins as wired and
@@ -117,13 +175,21 @@ void setup() {
   Wire.setWireTimeout(25000, true);   // as the firmware (rev 6b)
   bus2.begin();
   benchBanner(F("02_sht31_dewpoint"));
-  Serial.println(F("BTN1 short: reset counters | BTN2 short: 2 s / 0.5 s | BTN1 long: breath marker"));
+  Serial.println(F("BTN1 short: reset counters | BTN2 short: 2 s / 0.5 s | BTN1 long: 10 min calibration | BTN2 long: bus scan"));
   benchButtonsBegin();
   softScan();
 }
 
 void loop() {
   benchButtonsUpdate();
+  if (calOn && (btn1.pressed || btn2.pressed)) {
+    calOn = false;
+    btn1.consume(); btn2.consume();
+    benchLed(0, 0, 0);
+    Serial.println(F("--- calibration aborted ---"));
+  }
+  if (calOn && millis() - calStart >= CAL_S * 1000UL) calFinish();
+  if (Serial.available() && Serial.read() == 'b') Serial.println(F("--- breathe on a sensor now ---"));
   if (btn1.shortPress) {
     for (Dev &d : devs) d.nack = d.crc = 0;
     Serial.println(F("--- counters reset ---"));
@@ -132,7 +198,7 @@ void loop() {
     periodMs = periodMs == 2000 ? 500 : 2000;
     Serial.print(F("--- period ")); Serial.print(periodMs); Serial.println(F(" ms ---"));
   }
-  if (btn1.longPress) Serial.println(F("--- breathe on a sensor now ---"));
+  if (btn1.longPress) calStartRun();
   if (btn2.longPress) softScan();
 
   static uint32_t last;

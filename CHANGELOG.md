@@ -53,6 +53,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-03: averaged SHT calibration in `02_sht31_dewpoint`
+- BTN1 long: 10 min run averaging the raw T/RH of A, B and R, then prints each sensor's offset to the median of the
+  three as `#define SHT_T_OFFSET_*` / `SHT_RH_OFFSET_*`. The breath marker moved to serial `b`.
+- The FW 0.8.1 offsets came from one reading (R drifted 0.24 °C right after); they stay until this run replaces them.
 ## FW 0.8.1 + lite 1.7 — 2026-11-03: SHT calibration to the median
 - All three SHTs side by side, raw: A 21.45 °C 33.5 %, B 22.51 °C 34.8 %, R 22.64 °C 35.0 %. Each pulled to the median
   (22.51 °C, 34.8 %): A +1.06 °C / +1.3 % RH, B 0 / 0, R −0.13 °C / −0.2 % RH. New `SHT_T_OFFSET_*` (temperature was

@@ -168,7 +168,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 - **SHT30**: 0x44 on its own software I2C bus (D38/D40), same command set and CRC. Pull-ups: the module's own plus the
   Mega's internal ones.
 - **Calibration** (2026-11-03, FW 0.8.1, all three side by side, each pulled to the median of the three raw readings):
-  A 0x44 +1.06 °C / +1.3 % RH, B 0x45 0 / 0 (the median), R −0.13 °C / −0.2 % RH. Added to the reading (RH clamped to
+  A 0x44 +1.06 °C / +1.3 % RH, B 0x45 0 / 0 (the median), R −0.13 °C / −0.2 % RH — from a single reading, provisional
+  until the 10 min averaged run in `02_sht31_dewpoint`. Added to the reading (RH clamped to
   0…100) before the dew point; in the firmware, lite170 and the SHT test sketches. History: RH-only offsets
   A +0.75/+1.15, B −0.75/−1.15 (2026-10-28, FW 0.4.9).
 - All three use single-shot, no clock stretching (0x2400), triggered every 2 s and read 20 ms later.
@@ -399,7 +400,8 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 Each test is its own sketch in `tests/`. P2 goes last. The harness only gets built once every test passes.
 1. `00_watchdog` — clean boot and a WDT reset check
 2. `01_ntc` — all three probes, ice-water offsets, optional second point for Beta
-3. `02_sht31_dewpoint` — SHT31 A/B and the SHT30 on soft I2C, CRC, DP spread
+3. `02_sht31_dewpoint` — SHT31 A/B and the SHT30 on soft I2C, CRC, DP spread. BTN1 long = 10 min calibration run
+   (raw T/RH averages, offsets to the median of the three, printed as `config.h` lines); BTN2 long = soft-bus scan
 4. `03_fuse_sense` — 12V present, 12V absent, and a pulled fuse
 5. `04_buttons_led` — short and long press
 6. `05_fan_pwm_tach`
