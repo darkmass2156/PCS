@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.9.0 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan header | rev11 | `fw-v0.9.0` |
 | 2026-11-04 | 0.8.4 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct + RC | rev11 | `fw-v0.8.4` |
 | 2026-11-04 | 0.8.3 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.3` |
 | 2026-11-04 | 0.8.2 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.2` |
@@ -61,6 +62,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.0, DISP 9 — 2026-11-04: one fan header
+- Both fans on the FAN2 header with a Y-splitter (`FAN1_TACH_FITTED 0`): D18 not read, no FAN 1 STALL alarm,
+  rpmF1 column 0; Mode 3 FAN row shows one rpm.
 ## FW 0.8.4 — 2026-11-04
 - Tach filter also needs the line HIGH ≥ 1 ms before a counted falling edge (`TACH_HIGH_MIN_US`, CHANGE interrupts).
   Bench after 10k + 100 nF: fan 2 read exactly double above ~1000 rpm (glitch on the slow rising edge counted).

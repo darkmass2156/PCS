@@ -70,7 +70,9 @@ static inline void tachEdge(bool high, uint32_t t, uint32_t &rise, uint32_t &las
   if (high) { rise = t; return; }
   if (t - rise >= TACH_HIGH_MIN_US && t - last >= TACH_LOCKOUT_US) { n++; last = t; }
 }
+#if FAN1_TACH_FITTED
 static void isrTach1() { tachEdge(PIND & _BV(PD3), micros(), riseF1, lastF1, pulsesF1); }   // D18 = PD3
+#endif
 static void isrTach2() { tachEdge(PIND & _BV(PD2), micros(), riseF2, lastF2, pulsesF2); }   // D19 = PD2
 
 // D12 = PB6 = PCINT6 (fires on any change in the group).
@@ -89,7 +91,9 @@ void hwInit() {
   pinMode(PIN_TACH1, INPUT_PULLUP);   // fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04), no LG 10k:
   pinMode(PIN_TACH2, INPUT_PULLUP);   // internal ~35k pull-up (an external 10k at the Mega end is still welcome)
   pinMode(PIN_PUMP_TACH, INPUT);
+#if FAN1_TACH_FITTED
   attachInterrupt(digitalPinToInterrupt(PIN_TACH1), isrTach1, CHANGE);
+#endif
   attachInterrupt(digitalPinToInterrupt(PIN_TACH2), isrTach2, CHANGE);
   PCMSK0 = _BV(PCINT6);
   PCIFR = _BV(PCIF0);
@@ -109,14 +113,15 @@ void hwUpdateTach(uint32_t now) {
   interrupts();
   lastRpmAt = now;
   // 2 pulses per revolution
-  rpmFan1 = (uint16_t)((f1 * 30000UL) / dt);
+  rpmFan1 = FAN1_TACH_FITTED ? (uint16_t)((f1 * 30000UL) / dt) : 0;
   rpmFan2 = (uint16_t)((f2 * 30000UL) / dt);
   rpmPump = (uint16_t)((p * 30000UL) / dt);
 #if SIM_FAKE_P2_TACH
   if (hwPen()) rpmPump = 3000;
 #endif
 #if SIM_FAKE_FAN_TACH
-  rpmFan1 = rpmFan2 = hwFanPct() * 30;   // iPPC-3000: ~30 rpm per %
+  rpmFan2 = hwFanPct() * 30;   // iPPC-3000: ~30 rpm per %
+  rpmFan1 = FAN1_TACH_FITTED ? rpmFan2 : 0;
 #endif
 }
 

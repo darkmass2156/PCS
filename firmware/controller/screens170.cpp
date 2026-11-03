@@ -587,7 +587,10 @@ uint32_t Screens170::widget(uint8_t i, const UiData &d, bool draw) {
         case 12: fmt1(b, d.tout, d.toutOk); break;
         case 13: snprintf(b, sizeof(b), "%sK %s", fmt1(a, d.potK, d.potOk), potText(c, d)); break;
         case 14: if (d.p2On) snprintf(b, sizeof(b), "%u%% %u", d.p2Pct, d.rpmP2); else strcpy(b, "OFF"); break;
-        case 15: snprintf(b, sizeof(b), "%u%% %u/%u", d.fanPct, d.rpmF1, d.rpmF2); break;
+        case 15:
+          if (d.rpmF1 == 0xFFFF) snprintf(b, sizeof(b), "%u%% %u", d.fanPct, d.rpmF2);
+          else snprintf(b, sizeof(b), "%u%% %u/%u", d.fanPct, d.rpmF1, d.rpmF2);
+          break;
         case 16: snprintf(b, sizeof(b), "%X %03X %03X", d.fuses, d.faults, d.alarms); break;   // fuse/fault/alarm
         default: {   // 17 case, 18 room
           bool room = i == 18;

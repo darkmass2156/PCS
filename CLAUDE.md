@@ -10,7 +10,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | Hardware | **6b** (PW + LG boards, display RES on D47, 1.9" display, SHT30 header) | this file; change note `docs/changes/hw_rev6b.md`; BOM `docs/build_component_list_rev4b.xlsx` (rev 4b) |
 | Schematic | rev11 | `docs/schematics/full_loop_schematic_rev11.png` |
 | Control logic | rev 2 | this file → Control; change note `docs/changes/logic_rev2.md` |
-| Display software | rev 8 (1.9" 320x170 layouts, Pingu crashes into ROG, AA fonts, fan-alarm and test banners) | this file → Display; `DISPLAY_REV` in `version.h` |
+| Display software | rev 9 (1.9" 320x170 layouts, Pingu crashes into ROG, AA fonts, fan-alarm and test banners, one fan tach) | this file → Display; `DISPLAY_REV` in `version.h` |
 | Firmware | see `firmware/controller/version.h` | `CHANGELOG.md` |
 
 ### How revisions are tracked
@@ -78,6 +78,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
   50 °C on the bench (17 W held open for the whole RUN, inside the box). Possibly replaced later by a second 3-way
   (OPEN). See `docs/changes/v1_dropped.md`.
 - **Fans**: 2× NF-F12 iPPC-3000 on the outdoor XE 240. Their 12V is unswitched; only PWM controls them.
+  Since 2026-11-04 both on the **FAN2 header** through a Y-splitter (`FAN1_TACH_FITTED 0`): only one fan's tach is
+  read (D19), fan 1 has no stall alarm. FAN1 header / D18 unused.
 - **NTCs**: 3× Bykski B-PD5-TMR 10k probes on the Mega (T1, T2, T3). The cube NTC goes to the Apex.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
   because 0x44/0x45 are taken). SHT30 powered from the Mega header 5V/GND; no board change.
@@ -105,8 +107,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D3 | PUMP_PWM | OC3C, 25 kHz |
 | D9 / D10 / D11 | LED R / B / G | common-cathode RGB, analogWrite (Timer2 / Timer1). As built G and B are swapped vs the pinout doc (green die on D11, blue on D10, bench 2026-11-03); `PIN_LED_G/B` and `bench.h` follow the build |
 | D12 | PUMP_TACH | not an INT pin → PCINT6 (PCINT0 group) |
-| D18 | TACH1 | INT3. Since 2026-11-04 wired straight from PW C22 (LINK 3 off LG A5, H5·4 empty), internal pull-up |
-| D19 | TACH2 | INT2. Straight from PW D22 (LINK 4 off LG A6, H5·3 empty), internal pull-up |
+| D18 | TACH1 | **unused** (`FAN1_TACH_FITTED 0`, FAN1 header dropped 2026-11-04). Was straight from PW C22 |
+| D19 | TACH2 | INT2. Straight from PW D22 (LINK 4 off LG A6, H5·3 empty), 10k to 5V + 100 nF to GND at the Mega, internal pull-up on |
 | D20 / D21 | SDA / SCL | 4.7k pull-ups to 5V |
 | D22 | VO | V2 open |
 | D24 | VC | V2 close |
@@ -462,7 +464,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
-- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_LOCKOUT_US` = 3000, `TACH_HIGH_MIN_US` = 1000
+- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_LOCKOUT_US` = 3000, `TACH_HIGH_MIN_US` = 1000, `FAN1_TACH_FITTED` = 0
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C

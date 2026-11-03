@@ -157,7 +157,7 @@ static void buildUi() {
   ui.v2deg = valveDeg();
   ui.v2homed = valveHomed();
   ui.fanPct = hwFanPct();
-  ui.rpmF1 = rpmFan1;
+  ui.rpmF1 = FAN1_TACH_FITTED ? rpmFan1 : 0xFFFF;   // 0xFFFF = not fitted
   ui.rpmF2 = rpmFan2;
   ui.p2On = hwPen();
   ui.p2Pct = hwPumpPct();

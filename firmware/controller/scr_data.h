@@ -22,7 +22,7 @@ struct UiData {
   float v2deg;
   bool v2homed;
   uint8_t fanPct;
-  uint16_t rpmF1, rpmF2;
+  uint16_t rpmF1, rpmF2;   // rpmF1 0xFFFF = no FAN1 tach (one header + splitter)
   bool p2On;
   uint8_t p2Pct;
   uint16_t rpmP2;

@@ -134,7 +134,7 @@ static void updateFaults(uint32_t now) {
   // Fan stall (alarm only)
   const uint16_t rpm[2] = {rpmFan1, rpmFan2};
   const uint16_t bit[2] = {A_FAN1_STALL, A_FAN2_STALL};
-  for (uint8_t i = 0; i < 2; i++) {
+  for (uint8_t i = FAN1_TACH_FITTED ? 0 : 1; i < 2; i++) {   // no FAN1 tach: fan 1 isn't monitored
     if (fusesSettled && fusePresent[1] && hwFanPct() > 0 && rpm[i] == 0) {
       fanZero[i].hold(now);
       if (fanZero[i].elapsed(now, FAN_STALL_MS)) a |= bit[i];

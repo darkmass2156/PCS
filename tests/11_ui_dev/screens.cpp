@@ -558,7 +558,10 @@ uint32_t Screens::widget(uint8_t i, const UiData &d, bool draw) {
         case 12: fmt1(b, d.tout, d.toutOk); break;
         case 13: snprintf(b, sizeof(b), "%sK %s", fmt1(a, d.potK, d.potOk), potText(c, d)); break;
         case 14: if (d.p2On) snprintf(b, sizeof(b), "%u%% %u", d.p2Pct, d.rpmP2); else strcpy(b, "OFF"); break;
-        case 15: snprintf(b, sizeof(b), "%u%% %u/%u", d.fanPct, d.rpmF1, d.rpmF2); break;
+        case 15:
+          if (d.rpmF1 == 0xFFFF) snprintf(b, sizeof(b), "%u%% %u", d.fanPct, d.rpmF2);
+          else snprintf(b, sizeof(b), "%u%% %u/%u", d.fanPct, d.rpmF1, d.rpmF2);
+          break;
         case 16: snprintf(b, sizeof(b), "0x%X", d.fuses); break;
         case 17: snprintf(b, sizeof(b), "0x%03X", d.faults); break;
         default: snprintf(b, sizeof(b), "0x%03X", d.alarms); break;
