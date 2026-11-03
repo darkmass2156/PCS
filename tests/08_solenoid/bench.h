@@ -4,7 +4,7 @@
 // After editing this file run:  for d in tests/[0-9]*/; do cp tests/common/bench.h "$d"; done
 #include <Arduino.h>
 
-#define BENCH_VERSION "1.8"
+#define BENCH_VERSION "1.9"
 
 // Safety rule 1 for every sketch: all switched outputs LOW before anything else.
 inline void benchOutputsLow() {
@@ -84,10 +84,14 @@ inline void benchButtonsUpdate() {
 }
 
 // ---------------- LED ----------------
+// As built (bench 2026-11-03): red D9, green D11, blue D10. BENCH_LED_PCT scales all three (lite170: 80).
+#ifndef BENCH_LED_PCT
+#define BENCH_LED_PCT 100
+#endif
 inline void benchLed(uint8_t r, uint8_t g, uint8_t b) {
-  analogWrite(9, r);
-  analogWrite(10, g);
-  analogWrite(11, b);
+  analogWrite(9, (uint16_t)r * BENCH_LED_PCT / 100);
+  analogWrite(11, (uint16_t)g * BENCH_LED_PCT / 100);
+  analogWrite(10, (uint16_t)b * BENCH_LED_PCT / 100);
 }
 
 // 0..255 breathing level (triangle squared), period in ms. Call from loop() only:

@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-03 | 0.7.0 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.0` |
 | 2026-11-02 | 0.6.1 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.1` |
 | 2026-11-02 | 0.6.0 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.0` |
 | 2026-11-01 | 0.5.4 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.5.4` |
@@ -44,6 +45,15 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.7.0 + lite 1.6, DISP 8, BENCH 1.9 — 2026-11-03
+- Serial test mode (`t` / `x`, state TEST, Mode 1 idle only): fans `f`, P2 `p`, V1 `v1`/`v0`, V2 `o`/`c`/`k`/`s`.
+  Faults stay armed; leaves on x, a button, a fault, 12V loss or 30 min idle. `h` prints the commands.
+  Serial input is now line based (CR/LF or 50 ms silence).
+- Display rev 8 (320x170): fan alarms (fan fuse, fan 1/2 stall) as a maroon ALARM banner in Modes 1/2 and the Mode 3
+  bottom line; grey SERIAL TEST MODE banner. No LED change for alarms.
+- LED: green and blue are swapped in the build (Mode 2 breathed green) → `PIN_LED_G` 11 / `PIN_LED_B` 10, same in
+  `bench.h` (1.9). All LED output scaled to 80 % (`LED_BRIGHTNESS_PCT`, lite170 `BENCH_LED_PCT`).
 ## FW 0.6.1 — 2026-11-02
 - V2 close travel measured: play 726 ms + 1300 + 1800 + 1950 ms, same as open. `V2_T_CLOSE_MS` 5050 confirmed
   (was ASSUMED); no value change.

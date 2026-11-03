@@ -22,4 +22,5 @@ sheet(['mode1', 'mode2', 'mode3', 'mode1_changed', 'mode2_changed', 'mode3_chang
 sheet(['b170_0_noot', 'b170_1_noot', 'b170_2_noot', 'b170_0_crash_a', 'b170_1_crash_b', 'b170_2_crash_c',
        'b170_0_rog'], 'preview170_boot.png')
 sheet(['s170_1', 's170_2', 's170_3', 's170_1_fault', 's170_2_fault', 's170_3_fault',
+       's170_1_alarm', 's170_2_alarm', 's170_3_alarm', 's170_1_test',
        's170_1_lite', 's170_2_lite', 's170_3_lite'], 'preview170_modes.png')

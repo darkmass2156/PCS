@@ -12,6 +12,7 @@ void valveSetPowerOk(bool ok);          // 12V and S3 present; false stops V2 an
 bool valveStep(ValveDir dir, uint32_t ms);
 void valvePark();                        // drive VC for V2_PARK_MS (autostop), then θ = 0 and homed
 void valveStop();
+bool valveJog(ValveDir dir, uint32_t ms);   // test mode: a plain timed run (no edge / dead-zone logic)
 bool valveBusy();
 bool valveHomed();
 bool valveParked();                      // homed, θ = 0 and idle

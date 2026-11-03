@@ -8,6 +8,7 @@
 //   BTN1 long   PWM fade test: each channel 0 -> 255 -> 0 with analogWrite (Timer2 D9/D10, Timer1 D11)
 //   BTN2 long   colour sample: the colours both LED schemes use, 2 s each, with their names
 // Serial: p pause, n next, f fade, c colours, ? help.
+// As built 2026-11-03 the panel has green on D11 and blue on D10 (the firmware and bench.h map it).
 // Pass: D9 = red, D10 = green, D11 = blue, all three = white-ish; fades are smooth with no flicker.
 
 #include "bench.h"

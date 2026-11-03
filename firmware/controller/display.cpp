@@ -165,6 +165,7 @@ static void buildUi() {
   ui.dew = ui.valve - ui.dp;                              // NAN if either is
   ui.faults = st.faults;
   ui.alarms = st.alarms;
+  ui.test = st.state == ST_TEST;
   ui.fuses = (fusePresent[0] ? 1 : 0) | (fusePresent[1] ? 2 : 0) | (fusePresent[2] ? 4 : 0);
 }
 

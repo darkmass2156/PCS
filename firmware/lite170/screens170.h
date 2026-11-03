@@ -27,7 +27,7 @@ class Screens170 {
   uint32_t now;
   uint32_t cache[24];
   uint8_t barPrev[5];
-  uint8_t stripKind;      // what the bottom strip shows now: 0 nothing, 1 normal, 2 no 12V, 3 fault
+  uint8_t stripKind;      // what the bottom strip shows now: 0 nothing, 1 normal, 2 no 12V, 3 fault, 4 fan alarm, 5 test
   const char *ver;
   // chart: ring buffer aligned with the columns, (v + 10) * 5 -> 0..250 (0.2 °C, -10..40 °C)
   uint8_t hist[3][CHART170_W];
@@ -45,4 +45,5 @@ class Screens170 {
   uint32_t slantBar(uint8_t slot, int16_t x, int16_t y, int16_t w, int16_t h, uint8_t nseg, uint8_t lit,
                     uint8_t redFrom, uint8_t redTo, bool tipRed, bool draw);
   const char *faultText(const UiData &d, uint8_t &count) const;
+  const char *fanAlarmText(const UiData &d, uint8_t &count) const;
 };

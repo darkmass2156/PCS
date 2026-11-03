@@ -177,6 +177,73 @@ static void printStatus() {
   }
 }
 
+// ---------------- serial commands ----------------
+static void testHelp() {
+  Serial.println(F("# commands: ? status | h help | t test mode on (Mode 1, idle) | x test mode off"));
+  Serial.println(F("#   in test mode: f<0-100> fans % | p<0-100> P2 % (p0 = PEN off) | v1 / v0 V1 open / closed"));
+  Serial.println(F("#                 o<ms> / c<ms> V2 open / close run (max 15000) | k park V2 | s stop V2"));
+  Serial.println(F("#   faults stay armed; test mode ends on x, a button, a fault, 12V loss or 30 min idle"));
+}
+
+static void testState() {
+  Serial.print(F("# TEST fans ")); Serial.print(hwFanPct());
+  Serial.print(F("% P2 ")); Serial.print(hwPen() ? F("on ") : F("off ")); Serial.print(hwPumpPct());
+  Serial.print(F("% V1 ")); Serial.print(hwSen() ? F("open") : F("closed"));
+  Serial.print(F(" V2 ")); Serial.print(valveDeg(), 1); Serial.println(valveHomed() ? F(" deg") : F(" deg (not homed)"));
+}
+
+static void runCommand(char *s) {
+  char c = s[0];
+  long n = atol(s + 1);
+  if (c == '?') {
+    printStatus();
+    sensorsRoomDiag();
+    reportEvents(true);
+    return;
+  }
+  if (c == 'h') { testHelp(); return; }
+  if (c == 't') {
+    if (controlTestEnter()) { Serial.println(F("# TEST mode ON")); testState(); }
+    else Serial.println(F("# TEST refused: needs Mode 1 (BTN1), idle, 12V present and no fault"));
+    return;
+  }
+  if (c == 'x') {
+    if (controlTesting()) { controlTestExit(); Serial.println(F("# TEST mode OFF, V2 parking")); }
+    return;
+  }
+  if (!strchr("fpvocks", c)) { Serial.println(F("# ? unknown command, h for help")); return; }
+  if (!controlTesting()) { Serial.println(F("# not in test mode: send t first (Mode 1)")); return; }
+  bool ok = true;
+  switch (c) {
+    case 'f': controlTestFan(constrain(n, 0, 100)); break;
+    case 'p': controlTestPump(constrain(n, 0, 100)); break;
+    case 'v': controlTestV1(n == 1); break;
+    case 'o': ok = valveJog(V_OPEN, constrain(n, 1, 15000)); break;
+    case 'c': ok = valveJog(V_CLOSE, constrain(n, 1, 15000)); break;
+    case 'k': valvePark(); break;
+    case 's': valveStop(); break;
+  }
+  if (!ok) Serial.println(F("# V2 busy or no 12V on S3: not moved"));
+  testState();
+}
+
+// Line based: a command ends with CR/LF or 50 ms of silence (works with any serial-monitor line ending).
+static void serialInput(uint32_t now) {
+  static char buf[16];
+  static uint8_t len;
+  static uint32_t lastCharAt;
+  while (Serial.available()) {
+    char ch = Serial.read();
+    lastCharAt = now;
+    if (ch == '\r' || ch == '\n') {
+      if (len) { buf[len] = 0; runCommand(buf); len = 0; }
+    } else if (len < sizeof(buf) - 1 && ch != ' ') {
+      buf[len++] = ch;
+    }
+  }
+  if (len && now - lastCharAt >= 50) { buf[len] = 0; runCommand(buf); len = 0; }
+}
+
 void setup() {
   hwAllOutputsLow();               // safety rule 1: before anything else
   valveInit();
@@ -219,13 +286,7 @@ void loop() {
     reportEvents(true);
     listed = true;
   } else reportEvents(false);
-  while (Serial.available()) {
-    if (Serial.read() == '?') {
-      printStatus();
-      sensorsRoomDiag();
-      reportEvents(true);
-    }
-  }
+  serialInput(now);
 
   displayUpdate(now);              // last: never in the safety path
 }

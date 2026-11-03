@@ -16,6 +16,9 @@ static Since parked, forced, p2Zero, fanZero[2];
 static uint32_t noFlowAt, seqAt;
 static bool noFlow, bootSettle = true, v12Was;
 static uint8_t seqStep, fanPct = FAN_PWM_MIN;
+static uint8_t testFan, testPump;
+static bool testV1;
+static uint32_t testAt;
 
 // ---------------- helpers ----------------
 static void enter(BranchState s, uint32_t now) {
@@ -227,6 +230,7 @@ void controlInit(uint32_t now) {
 }
 
 void controlButton(Mode m) {
+  if (st.state == ST_TEST) controlTestExit();
   st.faults &= st.faultsLive;   // acknowledge faults whose cause is gone
   if (m != st.mode) {
     st.mode = m;
@@ -335,6 +339,25 @@ void controlUpdate(uint32_t now) {
       }
       break;
 
+    case ST_TEST:
+      if (st.mode != MODE_OFF || now - testAt >= TEST_TIMEOUT_MS) {
+        controlTestExit();
+        break;
+      }
+      setFans(testFan);
+      hwSetSen(testV1);
+      if (testPump) {
+        if (!hwPen()) {
+          hwSetPen(true);
+          p2OnAt = now;            // P2 stall check starts after the spin-up grace, as in RUN
+        }
+        hwSetPumpPct(testPump);
+      } else {
+        hwSetPen(false);
+        hwSetPumpPct(0);
+      }
+      break;
+
     case ST_SAFE:
       p2AndV1Off();
       setFans(FAN_PWM_MIN);
@@ -356,6 +379,31 @@ const char *stateName(BranchState s) {
     case ST_RUN:      return "RUN";
     case ST_STOPPING: return "STOP";
     case ST_SAFE:     return "SAFE";
+    case ST_TEST:     return "TEST";
   }
   return "?";
 }
+
+// ---------------- serial test mode ----------------
+bool controlTestEnter() {
+  if (st.state != ST_IDLE || st.mode != MODE_OFF) return false;
+  testFan = FAN_PWM_MIN;
+  testPump = 0;
+  testV1 = false;
+  testAt = millis();
+  enter(ST_TEST, testAt);
+  return true;
+}
+
+void controlTestExit() {
+  if (st.state != ST_TEST) return;
+  p2AndV1Off();
+  setFans(FAN_PWM_MIN);
+  if (!valveParked()) valvePark();   // IDLE re-parks anyway; start right away
+  enter(ST_IDLE, millis());
+}
+
+bool controlTesting() { return st.state == ST_TEST; }
+void controlTestFan(uint8_t pct) { testFan = pct > 100 ? 100 : pct; testAt = millis(); }
+void controlTestPump(uint8_t pct) { testPump = pct > 100 ? 100 : pct; testAt = millis(); }
+void controlTestV1(bool open) { testV1 = open; testAt = millis(); }

@@ -82,6 +82,34 @@ const char *Screens170::faultText(const UiData &d, uint8_t &count) const {
   return "";
 }
 
+static const char *const FAN_ALARM_NAMES[] = {"FAN FUSE", "FAN 1 STALL", "FAN 2 STALL"};
+static const uint16_t FAN_ALARM_MASK = 0x07;   // alarm bits 0..2 (control.h A_FUSE_FAN, A_FAN1/2_STALL)
+
+const char *Screens170::fanAlarmText(const UiData &d, uint8_t &count) const {
+  uint16_t m = d.alarms & FAN_ALARM_MASK;
+  count = 0;
+  for (uint16_t k = m; k; k &= k - 1) count++;
+  if (!count) return "";
+  uint8_t n = (now / 2000) % count;
+  for (uint8_t i = 0; i < 3; i++) {
+    if (!(m & (1 << i))) continue;
+    if (n-- == 0) return FAN_ALARM_NAMES[i];
+  }
+  return "";
+}
+
+// Bottom-strip kind: 1 normal, 2 no 12V, 3 fault, 4 fan alarm, 5 serial test.
+static uint8_t stripKindFor(const UiData &d) {
+  if (d.no12v) return 2;
+  if (d.faults) return 3;
+  if (d.test) return 5;
+  if (d.alarms & FAN_ALARM_MASK) return 4;
+  return 1;
+}
+static uint16_t stripBg(uint8_t kind) {
+  return kind == 1 ? C_BLK : kind == 3 ? C_RED : kind == 4 ? C_MAR : C_DG;
+}
+
 // ---------------- frame ----------------
 void Screens170::begin(Adafruit_ST7789 *t, const char *version) {
   gfx = t;
@@ -213,15 +241,15 @@ uint32_t Screens170::slantBar(uint8_t slot, int16_t x, int16_t y, int16_t w, int
 // Mode 1 bottom strip (y 139..169): distance to dew with bar, or a banner.
 uint32_t Screens170::strip1(const UiData &d, bool draw) {
   char b[24], t[48];
-  uint8_t kind = d.no12v ? 2 : d.faults ? 3 : 1;
+  uint8_t kind = stripKindFor(d);
   uint8_t n = 0;
-  const char *f = faultText(d, n);
+  const char *f = kind == 4 ? fanAlarmText(d, n) : faultText(d, n);
   int16_t px = isnan(d.dew) ? 0 : clampi(lround(d.dew / 15 * 310), 0, 310);
   signed1(b, d.dew, "\xF8" "C");
-  uint32_t k = key(hs(kind == 3 ? f : b, hn(kind * 1000 + px + n * 7)));
+  uint32_t k = key(hs(kind == 3 || kind == 4 ? f : b, hn(kind * 1000 + px + n * 7)));
   if (!draw) return k;
   if (kind != stripKind) {
-    gfx->fillRect(0, 139, W, 31, kind == 1 ? C_BLK : kind == 2 ? C_DG : C_RED);
+    gfx->fillRect(0, 139, W, 31, stripBg(kind));
     if (kind == 1) {
       ftxt(F_LABEL, 4, 143, C_LG, C_BLK, "DISTANCE TO DEW   (0 ... +15 \xF8" "C)", 0);
       gfx->drawRect(4, 158, 312, 10, C_DG);
@@ -236,6 +264,14 @@ uint32_t Screens170::strip1(const UiData &d, bool draw) {
     gfx->fillRect(5 + px, 159, 310 - px, 8, C_BLK);
   } else if (kind == 2) {
     ftxt(F_VALUE, 4, 147, C_WHT, C_DG, "NO 12V  -  PC OFF", 312, 'c');
+  } else if (kind == 5) {
+    ftxt(F_VALUE, 4, 140, C_WHT, C_DG, "SERIAL TEST MODE", 312, 'c');
+    ftxt(F_LABEL, 4, 157, C_WHT, C_DG, "send x or press a button to leave", 312, 'c');
+  } else if (kind == 4) {
+    snprintf(t, sizeof(t), "ALARM: %s", f);
+    ftxt(F_VALUE, 4, 140, C_WHT, C_MAR, t, 312, 'c');
+    snprintf(t, sizeof(t), "%u active  -  system keeps running", n);
+    ftxt(F_LABEL, 4, 157, C_WHT, C_MAR, n > 1 ? t : "system keeps running", 312, 'c');
   } else {
     snprintf(t, sizeof(t), "FAULT: %s", f);
     ftxt(F_VALUE, 4, 140, C_WHT, C_RED, t, 312, 'c');
@@ -249,15 +285,15 @@ uint32_t Screens170::strip1(const UiData &d, bool draw) {
 uint32_t Screens170::strip2(const UiData &d, bool draw) {
   char t2[10], t[48];
   const char *v[3] = {d.extOpen ? "OPEN" : "CLOSED", valveText(d), fanText(t2, d)};
-  uint8_t kind = d.no12v ? 2 : d.faults ? 3 : 1;
+  uint8_t kind = stripKindFor(d);
   uint8_t n = 0;
-  const char *f = faultText(d, n);
+  const char *f = kind == 4 ? fanAlarmText(d, n) : faultText(d, n);
   uint32_t h = hn(kind);
-  if (kind == 3) h = hs(f, h);
+  if (kind == 3 || kind == 4) h = hs(f, h);
   else for (uint8_t k = 0; k < 3; k++) h = hs(v[k], h);
   if (!draw) return key(h);
   if (kind != stripKind) {
-    gfx->fillRect(0, 140, W, 30, kind == 1 ? C_BLK : kind == 2 ? C_DG : C_RED);
+    gfx->fillRect(0, 140, W, 30, stripBg(kind));
     if (kind == 1) {
       for (uint8_t k = 0; k < 3; k++) {
         int16_t x0 = 4 + k * 106;
@@ -278,6 +314,11 @@ uint32_t Screens170::strip2(const UiData &d, bool draw) {
     }
   } else if (kind == 2) {
     ftxt(F_VALUE, 4, 147, C_WHT, C_DG, "NO 12V  -  PC OFF", 312, 'c');
+  } else if (kind == 5) {
+    ftxt(F_VALUE, 4, 147, C_WHT, C_DG, "SERIAL TEST MODE", 312, 'c');
+  } else if (kind == 4) {
+    snprintf(t, sizeof(t), "ALARM: %s", f);
+    ftxt(F_VALUE, 4, 147, C_WHT, C_MAR, t, 312, 'c');
   } else {
     snprintf(t, sizeof(t), "FAULT: %s", f);
     ftxt(F_VALUE, 4, 147, C_WHT, C_RED, t, 312, 'c');
@@ -570,7 +611,10 @@ uint32_t Screens170::widget(uint8_t i, const UiData &d, bool draw) {
     default: {   // 20: bottom line (left of the legend), or the fault
       uint8_t n = 0;
       const char *f = faultText(d, n);
+      uint8_t na = 0;
+      const char *fa = fanAlarmText(d, na);
       if (d.faults) snprintf(b, sizeof(b), "FAULT %s (%u) 0x%03X", f, n, d.faults);
+      else if (na) snprintf(b, sizeof(b), "ALARM %s (%u)", fa, na);
       else {
         char a[12], c[10];
         signed1(a, d.dew, "\xF8" "C");
@@ -578,10 +622,10 @@ uint32_t Screens170::widget(uint8_t i, const UiData &d, bool draw) {
         snprintf(b, sizeof(b), "TO DEW %s  V2 %s\xF8  %s", a, c, d.no12v ? "NO 12V" : valveText(d));
       }
       if (draw) {
-        uint16_t bgc = d.faults ? C_RED : C_LG;
+        uint16_t bgc = d.faults ? C_RED : na ? C_MAR : C_LG;
         gfx->fillRect(0, 157, 4, 13, bgc);
         gfx->fillRect(4, 169, 246, 1, bgc);
-        ftxt(F_MONO, 4, 157, d.faults ? C_WHT : C_BLK, bgc, b, 246);
+        ftxt(F_MONO, 4, 157, (d.faults || na) ? C_WHT : C_BLK, bgc, b, 246);
       }
       return key(hs(b, i));
     }

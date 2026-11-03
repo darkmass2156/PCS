@@ -18,11 +18,12 @@
 #include <EEPROM.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#define BENCH_LED_PCT 80   // as the controller (LED_BRIGHTNESS_PCT)
 #include "bench.h"
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.5"
+#define LITE_VERSION "lite 1.6"
 #define TFT_RST 47          // rev 6b: RES on D47 through C5 pin 3 (680 Ω to GND on LG, so -1 = black screen)
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1

@@ -11,6 +11,7 @@ enum BranchState : uint8_t {
   ST_RUN,
   ST_STOPPING,
   ST_SAFE,       // latched fault
+  ST_TEST,       // serial test mode (Mode 1 only): outputs set by hand, faults still active
 };
 
 // Latched faults -> safe state
@@ -59,3 +60,12 @@ void controlInit(uint32_t now);
 void controlUpdate(uint32_t now);
 void controlButton(Mode m);      // a press selecting mode m (also acknowledges faults)
 const char *stateName(BranchState s);
+
+// Serial test mode. Enter only from Mode 1 at idle; leaves on 'x', a button press, a fault (-> SAFE),
+// 12V loss or TEST_TIMEOUT_MS without a command. All faults stay armed while it runs.
+bool controlTestEnter();
+void controlTestExit();
+bool controlTesting();
+void controlTestFan(uint8_t pct);
+void controlTestPump(uint8_t pct);   // 0 = PEN off
+void controlTestV1(bool open);

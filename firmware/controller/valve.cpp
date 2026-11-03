@@ -140,3 +140,9 @@ bool valveParked() { return homed && deg <= 0.0f && !valveBusy(); }
 bool valveShut() { return homed && deg <= V2_FLOW_DEG + EDGE_TOL_DEG && !valveBusy(); }
 float valveDeg() { return deg; }
 ValveDir valveMoving() { return moving; }
+
+bool valveJog(ValveDir dir, uint32_t ms) {
+  if (!powerOk || valveBusy() || dir == V_NONE) return false;
+  request(dir, ms, false);
+  return true;
+}

@@ -11,8 +11,8 @@
 #define PIN_FAN_PWM   2    // OC3B
 #define PIN_PUMP_PWM  3    // OC3C
 #define PIN_LED_R     9
-#define PIN_LED_G     10
-#define PIN_LED_B     11
+#define PIN_LED_G     11   // as built: green die on D11, blue on D10 (bench 2026-11-03, Mode 2 breathed green)
+#define PIN_LED_B     10
 #define PIN_PUMP_TACH 12   // PCINT6
 #define PIN_TACH1     18   // INT3
 #define PIN_TACH2     19   // INT2
@@ -109,6 +109,8 @@
 //     pulse in the mode colour, V2 moving = cyan flash, alarm = amber pulse, fault = fast red, boot / waiting for
 //     valid sensors = purple. Selectable so both can be judged on the real LED.
 #define LED_SCHEME       1
+#define LED_BRIGHTNESS_PCT 80     // all LED colours scaled to this (Vlad 2026-11-03)
+#define TEST_TIMEOUT_MS  1800000UL // serial test mode ends 30 min after the last command
 
 // ---------------- NTC ----------------
 #define NTC_R_PULLUP   10000.0f

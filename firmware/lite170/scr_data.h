@@ -27,6 +27,7 @@ struct UiData {
   uint8_t p2Pct;
   uint16_t rpmP2;
   float dew;               // valve - dp: margin above the dew point
-  uint16_t faults, alarms;
+  uint16_t faults, alarms; // alarm bits 0..2 = fan fuse, fan 1 stall, fan 2 stall (shown as a banner)
+  bool test;               // serial test mode
   uint8_t fuses;
 };

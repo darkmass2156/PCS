@@ -65,9 +65,9 @@ static bool greenActive;
 #endif
 
 static void ledWrite(const Rgb &c) {
-  analogWrite(PIN_LED_R, c.r);
-  analogWrite(PIN_LED_G, c.g);
-  analogWrite(PIN_LED_B, c.b);
+  analogWrite(PIN_LED_R, (uint16_t)c.r * LED_BRIGHTNESS_PCT / 100);
+  analogWrite(PIN_LED_G, (uint16_t)c.g * LED_BRIGHTNESS_PCT / 100);
+  analogWrite(PIN_LED_B, (uint16_t)c.b * LED_BRIGHTNESS_PCT / 100);
 }
 
 // Triangle wave squared (rough gamma): 0..255 over BREATH_MS.

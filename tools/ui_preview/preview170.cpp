@@ -77,6 +77,14 @@ int main(int argc, char **argv) {
     UiData f = d; f.faults = 0x100 | 0x002; f.state = "SAFE"; f.p2On = false;
     settle(s, f, now);
     tft.savePPM((OUT + "/s170_" + std::to_string(m) + "_fault.ppm").c_str());
+    UiData al = d; al.alarms = 0x001 | 0x008;   // fan fuse (+ an SHT alarm that must not show)
+    settle(s, al, now);
+    tft.savePPM((OUT + "/s170_" + std::to_string(m) + "_alarm.ppm").c_str());
+    if (m == 1) {
+      UiData t = d; t.test = true; t.state = "TEST";
+      settle(s, t, now);
+      tft.savePPM((OUT + "/s170_1_test.ppm").c_str());
+    }
     UiData l = lite(); l.mode = m;
     settle(s, l, now);
     tft.savePPM((OUT + "/s170_" + std::to_string(m) + "_lite.ppm").c_str());
