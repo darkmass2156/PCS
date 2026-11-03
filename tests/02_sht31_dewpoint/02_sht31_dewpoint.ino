@@ -1,5 +1,5 @@
 // 02_sht31_dewpoint — SHT31 A (0x44) and B (0x45) on hardware I2C (D20/D21, 50 kHz),
-// SHT30 room sensor (0x44) on software I2C (SDA2 D34, SCL2 D36).
+// SHT30 room sensor (0x44) on software I2C (SDA2 D38, SCL2 D40, straight to the Mega header).
 // Prints T, RH, dew point and NACK/CRC counts, plus DP max and spread.
 // Bench check 4 (rev 2): all three in the same air; DPs should agree within ~1 °C.
 //
@@ -13,7 +13,7 @@
 #include "softi2c.h"
 #include "bench.h"
 
-SoftI2C bus2(34, 36);
+SoftI2C bus2(38, 40);   // SHT30 straight on the Mega header (FW 0.7.1)
 
 // RH calibration offsets (% RH, as config.h SHT_RH_OFFSET_*): A read low, B high. Set 0 to see raw readings.
 struct Dev { const char *name; uint8_t addr; bool soft; float rhOfs; uint16_t nack, crc; };

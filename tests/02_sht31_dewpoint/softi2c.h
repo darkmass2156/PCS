@@ -1,8 +1,7 @@
 #pragma once
-// Copy of firmware/controller/softi2c.h — keep in sync.
 #include <Arduino.h>
 
-// Minimal bit-banged I2C master (open-drain emulation, ~25 kHz) for the SHT30 on D34/D36.
+// Minimal bit-banged I2C master (open-drain emulation, ~25 kHz) for the SHT30 on D38/D40.
 // No timers, no interrupts; every wait on SCL has a timeout.
 class SoftI2C {
  public:

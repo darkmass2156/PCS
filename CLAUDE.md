@@ -57,7 +57,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | T1 | NTC, internal loop return, between the 360 outlet and the tee | A5 |
 | T2 | NTC, V2 outlet (control sensor) | A4 |
 | T3 | NTC, outdoor XE 240 | A3 |
-| T_room | SHT30, outside the box on the room side | soft I2C D34/D36 |
+| T_room | SHT30, outside the box on the room side | soft I2C D38/D40 (direct to the Mega) |
 | DP_A / DP_B | SHT31 ×2 in case | I2C 0x44 / 0x45 |
 | DP_R | dew point from the SHT30 | — |
 | T_out | outdoor temperature estimate (see Feasibility) | — |
@@ -111,7 +111,7 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D26 | PEN | P2 enable |
 | D28 | SEN | V1 enable |
 | D30 / D32 | BTN1 / BTN2 | 10k pull-up, 1k + 100 nF RC, active LOW |
-| D34 / D36 | SDA2 / SCL2 | SHT30, software I2C (4.7k pull-ups to 5V on LG) |
+| D38 / D40 | SDA2 / SCL2 | SHT30, software I2C, wired straight to the Mega header (FW 0.7.1; D34/D36 via LG never answered, those pins are now unused) |
 | D47 | DISP_RES | ST7789 RES via 330/680 Ω divider (680 Ω to GND: must be driven), C5 pin 3 — rev 6b |
 | D49 | DISP_CS | ST7789 CS via 330/680 Ω divider |
 | D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 330/680 Ω dividers; D50 (MISO) unused, not wired |
@@ -141,7 +141,7 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   - Wires: S2 (Mega ribbon pin 32) > L7, and P7 > A20.
   - The DISP header becomes A15–A20, with A20 = CS.
   - Mega end: D49 on a 1-pin Dupont next to the SPI 2×2 housing.
-- **SHT30**: direct to the Mega header (5V, GND, D34 SDA2, D36 SCL2).
+- **SHT30**: direct to the Mega header (5V, GND, D38 SDA2, D40 SCL2), not through LG.
 
 ## Interfaces
 - **NTCs** (three, all the same probe model): 10k 1% pull-up to 5V, NTC to GND, 100 nF.
@@ -163,7 +163,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   `Wire.setWireTimeout(25000, true)`; after a timeout the bus is recovered (9 SCL pulses, STOP, Wire restart).
   Check the CRC on every read. **AL/ALERT pins unconnected** on all SHT3x: 5V on AL shorts the output and heats
   the sensor (cause of the 67–71 °C bench readings).
-- **SHT30**: 0x44 on its own software I2C bus (D34/D36), same command set and CRC.
+- **SHT30**: 0x44 on its own software I2C bus (D38/D40), same command set and CRC. Pull-ups: the module's own plus the
+  Mega's internal ones.
 - **RH calibration** (2026-10-28, side-by-side run; 0.75 first, 1.15 since FW 0.4.9): A 0x44 +1.15 % RH, B 0x45 −1.15 % RH, R 0. Added to the
   reading, clamped to 0…100, before the dew point; in the firmware, lite170 and the SHT test sketches.
 - All three use single-shot, no clock stretching (0x2400), triggered every 2 s and read 20 ms later.

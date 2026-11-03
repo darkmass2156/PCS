@@ -22,8 +22,8 @@
 #define PIN_SEN       28
 #define PIN_BTN1      30
 #define PIN_BTN2      32
-#define PIN_SDA2      34   // SHT30 soft I2C
-#define PIN_SCL2      36
+#define PIN_SDA2      38   // SHT30 soft I2C, wired straight to the Mega header (was D34 via LG, never answered)
+#define PIN_SCL2      40
 #define PIN_DISP_RST  47   // rev 6b: display RES through C5 pin 3 (680 Ω to GND on LG: -1 would hold it in reset)
 #define PIN_DISP_CS   49
 #define PIN_DISP_DC   53
