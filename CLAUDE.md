@@ -39,7 +39,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
   identical copy. Same for `softi2c.*` and the display files `fonts.h`, `scr_gfx.*`, `scr_data.h`, `screens.*`, `splash.h`,
   `boot_sprite.h`, `rog_logo.h`, `screens170.*` (all canonical in `firmware/controller/`, copied into
   `tests/11_ui_dev`, and except `screens.*` into `firmware/lite170`; `fonts.h` and `scr_gfx.*` also into
-  `tests/12_disp170_sht31`). `bench.h` is copied into `firmware/lite170` too.
+  `tests/12_disp170_sht31` and `tests/05_fan_pwm_tach`). `bench.h` is copied into `firmware/lite170` too.
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
   Everything else (SHT3x, soft I2C) is in-tree.
@@ -411,7 +411,8 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
    (raw T/RH averages, offsets to the median of the three, printed as `config.h` lines); BTN2 long = soft-bus scan
 4. `03_fuse_sense` — 12V present, 12V absent, and a pulled fuse
 5. `04_buttons_led` — short and long press
-6. `05_fan_pwm_tach`
+6. `05_fan_pwm_tach` — duty on the buttons, raw vs filtered rpm per fan, also on the 1.9" display (filtered rpm big,
+   raw rpm, live tach line level)
 7. `06_display` — run it on both variants via `DISPLAY_VARIANT`
 8. `07_valve` — direction, t_full open/close, backlash, homing
 9. `08_solenoid`

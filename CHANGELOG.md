@@ -63,6 +63,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-04: `05_fan_pwm_tach` on the display
+- Duty, filtered rpm (big), raw rpm (red when far above filtered) and the live tach line level per fan on the 1.9"
+  panel (CS 49, DC 53, RES 47, 4 MHz). Copies `fonts.h` / `scr_gfx.*` from the controller.
 ## FW 0.9.0, DISP 9 — 2026-11-04: one fan header
 - Both fans on the FAN2 header with a Y-splitter (`FAN1_TACH_FITTED 0`): D18 not read, no FAN 1 STALL alarm,
   rpmF1 column 0; Mode 3 FAN row shows one rpm.
