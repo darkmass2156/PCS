@@ -105,8 +105,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D3 | PUMP_PWM | OC3C, 25 kHz |
 | D9 / D10 / D11 | LED R / B / G | common-cathode RGB, analogWrite (Timer2 / Timer1). As built G and B are swapped vs the pinout doc (green die on D11, blue on D10, bench 2026-11-03); `PIN_LED_G/B` and `bench.h` follow the build |
 | D12 | PUMP_TACH | not an INT pin → PCINT6 (PCINT0 group) |
-| D18 | TACH1 | INT3 |
-| D19 | TACH2 | INT2 |
+| D18 | TACH1 | INT3. Since 2026-11-04 wired straight from PW C22 (LINK 3 off LG A5, H5·4 empty), internal pull-up |
+| D19 | TACH2 | INT2. Straight from PW D22 (LINK 4 off LG A6, H5·3 empty), internal pull-up |
 | D20 / D21 | SDA / SCL | 4.7k pull-ups to 5V |
 | D22 | VO | V2 open |
 | D24 | VC | V2 close |

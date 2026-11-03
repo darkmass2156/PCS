@@ -76,8 +76,8 @@ void hwInit() {
   hwSetFanPct(0);
   hwSetPumpPct(0);
 
-  pinMode(PIN_TACH1, INPUT);   // external 10k pull-ups
-  pinMode(PIN_TACH2, INPUT);
+  pinMode(PIN_TACH1, INPUT_PULLUP);   // fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04), no LG 10k:
+  pinMode(PIN_TACH2, INPUT_PULLUP);   // internal ~35k pull-up (an external 10k at the Mega end is still welcome)
   pinMode(PIN_PUMP_TACH, INPUT);
   attachInterrupt(digitalPinToInterrupt(PIN_TACH1), isrTach1, FALLING);
   attachInterrupt(digitalPinToInterrupt(PIN_TACH2), isrTach2, FALLING);

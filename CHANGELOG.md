@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.8.2 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.2` |
 | 2026-11-03 | 0.8.1 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.1` |
 | 2026-11-03 | 0.8.0 + lite 1.6 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.0` |
 | 2026-11-03 | 0.7.1 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.1` |
@@ -55,6 +56,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.8.2 — 2026-11-04
+- Fan tachs rewired straight PW C22/D22 → Mega D18/D19 (bypassing LG and its 10k pull-ups J7/J8): D18/D19 now
+  `INPUT_PULLUP`, also in `05_fan_pwm_tach`. Bench: TACH2 picked up the 25 kHz fan PWM on the LG path.
 ## BENCH — 2026-11-04: `05_fan_pwm_tach` raw vs filtered tach
 - Prints raw rpm (every falling edge) next to filtered rpm (edge still LOW when the ISR reads it, 3 ms lockout) to
   show PWM noise coupling onto the tach lines (bench: tach readings far off).

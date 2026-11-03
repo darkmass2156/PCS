@@ -45,8 +45,8 @@ void setup() {
   TCCR3A = _BV(WGM31);
   TCCR3B = _BV(WGM33) | _BV(WGM32) | _BV(CS30);
   ICR3 = 639;
-  pinMode(18, INPUT);
-  pinMode(19, INPUT);
+  pinMode(18, INPUT_PULLUP);   // internal ~35k: the tach lines run straight PW -> Mega since 2026-11-04 (no LG 10k)
+  pinMode(19, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(18), isr1, FALLING);
   attachInterrupt(digitalPinToInterrupt(19), isr2, FALLING);
   Serial.begin(115200);
