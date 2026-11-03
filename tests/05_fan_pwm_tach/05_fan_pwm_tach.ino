@@ -10,6 +10,8 @@
 // Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2: a falling edge counts only if the pin is
 // still LOW in the ISR, the line was HIGH for >= TACH_HIGH_MIN_US before it, and >= TACH_LOCKOUT_US have passed since
 // the last counted one. Raw >> filtered = noise / glitches on the tach lines.
+// "per pulse a-b": rpm from the longest and shortest pulse interval in that second. Narrow range (a few %) with a
+// jumping per-second value = counting window; max ~ 2x min = missed pulses; wide smooth range = the fan itself hunts.
 // iPPC-3000: ~3000 rpm max = 100 Hz falling edges (10 ms apart), so the 3 ms lockout never drops a real pulse.
 
 #include <SPI.h>
@@ -26,18 +28,29 @@ const int16_t W = 320;
 const uint16_t TACH_LOCKOUT_US = 3000, TACH_HIGH_MIN_US = 1000;
 volatile uint16_t p1, p2, f1, f2;
 volatile uint32_t last1, last2, rise1, rise2;
+volatile uint32_t min1 = 0xFFFFFFFF, max1, min2 = 0xFFFFFFFF, max2;   // interval between counted edges, us
 // D18 = PD3 (INT3), D19 = PD2 (INT2); interrupts on CHANGE
 void isr1() {
   uint32_t t = micros();
   if (PIND & _BV(PD3)) { rise1 = t; return; }
   p1++;
-  if (t - rise1 >= TACH_HIGH_MIN_US && t - last1 >= TACH_LOCKOUT_US) { f1++; last1 = t; }
+  if (t - rise1 >= TACH_HIGH_MIN_US && t - last1 >= TACH_LOCKOUT_US) {
+    uint32_t iv = t - last1;
+    if (iv < min1) min1 = iv;
+    if (iv > max1) max1 = iv;
+    f1++; last1 = t;
+  }
 }
 void isr2() {
   uint32_t t = micros();
   if (PIND & _BV(PD2)) { rise2 = t; return; }
   p2++;
-  if (t - rise2 >= TACH_HIGH_MIN_US && t - last2 >= TACH_LOCKOUT_US) { f2++; last2 = t; }
+  if (t - rise2 >= TACH_HIGH_MIN_US && t - last2 >= TACH_LOCKOUT_US) {
+    uint32_t iv = t - last2;
+    if (iv < min2) min2 = iv;
+    if (iv > max2) max2 = iv;
+    f2++; last2 = t;
+  }
 }
 
 uint8_t duty;
@@ -151,13 +164,22 @@ void loop() {
   last = millis();
   noInterrupts();
   uint16_t a = p1, b = p2, fa = f1, fb = f2;
+  uint32_t mn1 = min1, mx1 = max1, mn2 = min2, mx2 = max2;
   p1 = p2 = f1 = f2 = 0;
+  min1 = min2 = 0xFFFFFFFF;
+  max1 = max2 = 0;
   interrupts();
   Serial.print(duty); Serial.print(F("% | raw "));
   Serial.print(a * 30000UL / dt); Serial.print(' ');
   Serial.print(b * 30000UL / dt); Serial.print(F(" | filtered "));
   Serial.print(fa * 30000UL / dt); Serial.print(' ');
-  Serial.println(fb * 30000UL / dt);
+  Serial.print(fb * 30000UL / dt);
+  // per-pulse speed range in this second: rpm from the longest and the shortest interval (2 pulses/rev)
+  Serial.print(F(" | per pulse fan1 "));
+  if (fa > 1) { Serial.print(30000000UL / mx1); Serial.print('-'); Serial.print(30000000UL / mn1); } else Serial.print('-');
+  Serial.print(F(" fan2 "));
+  if (fb > 1) { Serial.print(30000000UL / mx2); Serial.print('-'); Serial.print(30000000UL / mn2); } else Serial.print('-');
+  Serial.println();
   showFan(0, a * 30000UL / dt, fa * 30000UL / dt, PIND & _BV(PD3));
   showFan(1, b * 30000UL / dt, fb * 30000UL / dt, PIND & _BV(PD2));
   showDuty();
