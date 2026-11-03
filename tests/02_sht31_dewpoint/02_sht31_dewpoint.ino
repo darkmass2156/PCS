@@ -7,11 +7,13 @@
 //   BTN1 short  reset error counters
 //   BTN2 short  toggle read rate 2 s / 0.5 s (0.5 s stresses the long bus)
 //   BTN1 long   breath test marker: prints "--- breathe on a sensor now ---" (DP of that one should jump)
+//   BTN2 long   soft-bus scan (also at boot): D38/D40 idle levels, every address 0x08..0x77 as wired and swapped
 // LED: green flash per read with all valid, yellow if one missing, red if none.
 
 #include <Wire.h>
 #include "softi2c.h"
 #include "bench.h"
+#include <avr/wdt.h>
 
 SoftI2C bus2(38, 40);   // SHT30 straight on the Mega header (FW 0.7.1)
 
@@ -83,6 +85,28 @@ void readAll() {
   benchLed(0, 0, 0);
 }
 
+// Room-sensor bus check: idle levels with only the module's pull-ups, then every 7-bit address, pins as wired and
+// swapped. An SHT3x answers on 0x44/0x45; 0x40 = SHT2x/HTU21/Si7021, 0x38 = AHT10/20 (often sold as "SHT30").
+void softScan() {
+  pinMode(38, INPUT);
+  pinMode(40, INPUT);
+  delayMicroseconds(200);
+  Serial.print(F("--- soft bus idle (module pull-ups only): D38 ")); Serial.print(digitalRead(38) ? F("HIGH") : F("LOW"));
+  Serial.print(F("  D40 ")); Serial.println(digitalRead(40) ? F("HIGH") : F("LOW"));
+  for (uint8_t sw = 0; sw < 2; sw++) {
+    SoftI2C b(sw ? 40 : 38, sw ? 38 : 40);
+    b.begin();
+    Serial.print(sw ? F("--- swapped (SDA D40 SCL D38): ") : F("--- as wired (SDA D38 SCL D40): "));
+    uint8_t found = 0;
+    for (uint8_t a = 0x08; a <= 0x77; a++) {
+      if (b.write(a, nullptr, 0)) { Serial.print(F("0x")); Serial.print(a, HEX); Serial.print(' '); found++; }
+      wdt_reset();
+    }
+    Serial.println(found ? F("") : F("nothing"));
+  }
+  bus2.begin();
+}
+
 void setup() {
   benchOutputsLow();
   Serial.begin(115200);
@@ -93,6 +117,7 @@ void setup() {
   benchBanner(F("02_sht31_dewpoint"));
   Serial.println(F("BTN1 short: reset counters | BTN2 short: 2 s / 0.5 s | BTN1 long: breath marker"));
   benchButtonsBegin();
+  softScan();
 }
 
 void loop() {
@@ -106,6 +131,7 @@ void loop() {
     Serial.print(F("--- period ")); Serial.print(periodMs); Serial.println(F(" ms ---"));
   }
   if (btn1.longPress) Serial.println(F("--- breathe on a sensor now ---"));
+  if (btn2.longPress) softScan();
 
   static uint32_t last;
   if (millis() - last >= periodMs) {

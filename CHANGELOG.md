@@ -50,6 +50,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-03: `02_sht31_dewpoint` soft-bus scan
+- At boot and on BTN2 long: D38/D40 idle levels with the module pull-ups only, and an address scan 0x08..0x77 as wired
+  and swapped (finds an SHT3x on 0x45, or a different chip sold as SHT30: 0x40 SHT2x/HTU21, 0x38 AHT).
+  Bench: SHT30 straight on the Mega still NACKs on 0x44.
 ## FW 0.8.0 — 2026-11-03: V1 dropped
 - `V1_FITTED 0`: SEN never driven, V2 alone shuts the outdoor branch; flowing = P2 on and V2 above the edge.
   Reason and safety consequence: `docs/changes/v1_dropped.md`.
