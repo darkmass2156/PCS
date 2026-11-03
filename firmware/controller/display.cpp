@@ -151,7 +151,7 @@ static void buildUi() {
   ui.potOk = st.tOutOk && ntcT1.valid;
   ui.potK = ui.potOk ? ntcT1.c - st.tOut : NAN;
   ui.potW = ui.potOk ? K_POT * ui.potK : NAN;
-  ui.extOpen = hwSen();
+  ui.extOpen = V1_FITTED ? hwSen() : hwPen() && valveHomed() && valveDeg() > V2_FLOW_DEG;   // no V1: outdoor flowing
   ui.homing = st.state == ST_HOMING || (!valveHomed() && valveBusy());
   ui.mixing = valveHomed() && valveDeg() > V2_FLOW_DEG;
   ui.v2deg = valveDeg();

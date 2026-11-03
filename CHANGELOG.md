@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-03 | 0.8.0 + lite 1.6 | 8 | 1.9 | 2 | **6b**, V1 not fitted | rev11 | `fw-v0.8.0` |
 | 2026-11-03 | 0.7.1 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.1` |
 | 2026-11-03 | 0.7.0 + lite 1.6 | 8 | 1.9 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.7.0` |
 | 2026-11-02 | 0.6.1 + lite 1.5 | 7 | 1.8 | 2 | **6b** (PW + LG, RES D47, dividers 330/680) | rev11 | `fw-v0.6.1` |
@@ -48,6 +49,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.8.0 — 2026-11-03: V1 dropped
+- `V1_FITTED 0`: SEN never driven, V2 alone shuts the outdoor branch; flowing = P2 on and V2 above the edge.
+  Reason and safety consequence: `docs/changes/v1_dropped.md`.
 ## FW 0.7.1 — 2026-11-03
 - SHT30 moved to D38 (SDA2) / D40 (SCL2), wired straight to the Mega header; the LG path on D34/D36 never answered.
   Same in `02_sht31_dewpoint`. The `?` room probe follows the pins.

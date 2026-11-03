@@ -53,9 +53,10 @@ void hwSetPumpPct(uint8_t pct) {
 }
 
 void hwSetPen(bool on) { digitalWrite(PIN_PEN, on ? HIGH : LOW); }
-void hwSetSen(bool on) { digitalWrite(PIN_SEN, on ? HIGH : LOW); }
+void hwSetSen(bool on) { digitalWrite(PIN_SEN, (on && V1_FITTED) ? HIGH : LOW); }
 bool hwPen() { return digitalRead(PIN_PEN) == HIGH; }
 bool hwSen() { return digitalRead(PIN_SEN) == HIGH; }
+bool hwV1Open() { return V1_FITTED ? hwSen() : true; }   // without V1 nothing blocks the branch but V2
 uint8_t hwFanPct() { return fanPct; }
 uint8_t hwPumpPct() { return pumpPct; }
 

@@ -188,7 +188,7 @@ static void testHelp() {
 static void testState() {
   Serial.print(F("# TEST fans ")); Serial.print(hwFanPct());
   Serial.print(F("% P2 ")); Serial.print(hwPen() ? F("on ") : F("off ")); Serial.print(hwPumpPct());
-  Serial.print(F("% V1 ")); Serial.print(hwSen() ? F("open") : F("closed"));
+  Serial.print(F("% V1 ")); Serial.print(!V1_FITTED ? F("not fitted") : hwSen() ? F("open") : F("closed"));
   Serial.print(F(" V2 ")); Serial.print(valveDeg(), 1); Serial.println(valveHomed() ? F(" deg") : F(" deg (not homed)"));
 }
 
@@ -217,7 +217,10 @@ static void runCommand(char *s) {
   switch (c) {
     case 'f': controlTestFan(constrain(n, 0, 100)); break;
     case 'p': controlTestPump(constrain(n, 0, 100)); break;
-    case 'v': controlTestV1(n == 1); break;
+    case 'v':
+      if (!V1_FITTED) Serial.println(F("# V1 not fitted (V1_FITTED 0)"));
+      controlTestV1(n == 1);
+      break;
     case 'o': ok = valveJog(V_OPEN, constrain(n, 1, 15000)); break;
     case 'c': ok = valveJog(V_CLOSE, constrain(n, 1, 15000)); break;
     case 'k': valvePark(); break;

@@ -87,6 +87,8 @@
 #define V2_START_RATE_DEG_MIN  5.0f     // counted from the edge
 
 // ---------------- V1 / P2 / fans ----------------
+#define V1_FITTED        0        // 0: no V1 (dropped 2026-11-03, coil 1.4 A / >50 °C); SEN stays LOW, V2 alone shuts the
+                                  //    outdoor branch. 1: NC solenoid on SEN as designed.
 #define V1_OFF_DELAY_MS  10000UL
 #define P2_PWM_RUN       80
 #define P2_SPINUP_MS     3000UL

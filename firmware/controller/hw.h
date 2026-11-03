@@ -9,6 +9,7 @@ void hwSetPen(bool on);
 void hwSetSen(bool on);
 bool hwPen();
 bool hwSen();
+bool hwV1Open();                 // V1 open, or always true when V1_FITTED is 0
 uint8_t hwFanPct();
 uint8_t hwPumpPct();
 

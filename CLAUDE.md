@@ -52,7 +52,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 |---|---|---|
 | P1 | EK Kinetic D5, in case, fixed 90 % on the Apex | — |
 | P2 | Bykski D5 + res, controller box | PEN D26, PWM D3, tach D12 |
-| V1 | NC solenoid 2W-025-08 | SEN D28 |
+| V1 | NC solenoid 2W-025-08 — **not fitted** since 2026-11-03 (`V1_FITTED 0`) | SEN D28 (held LOW) |
 | V2 | CR-02 3-way T-port (LEFT outdoor, RIGHT bypass, TOP out) | VO D22, VC D24 |
 | T1 | NTC, internal loop return, between the 360 outlet and the tee | A5 |
 | T2 | NTC, V2 outlet (control sensor) | A4 |
@@ -74,7 +74,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - **P1**: in the case, controlled by the PC (Apex). Not on the Mega.
 - **P2**: the Mega switches its 12V (PEN) and drives PWM and tach.
 - **V2**: CR-02 12V, T-port, DN15, 3-wire with autostop.
-- **V1**: 2W-025-08, 1/4", 12V, normally closed.
+- **V1**: 2W-025-08, 1/4", 12V, normally closed. **Dropped 2026-11-03** (`V1_FITTED 0`): the coil drew 1.4 A and passed
+  50 °C on the bench (17 W held open for the whole RUN, inside the box). Possibly replaced later by a second 3-way
+  (OPEN). See `docs/changes/v1_dropped.md`.
 - **Fans**: 2× NF-F12 iPPC-3000 on the outdoor XE 240. Their 12V is unswitched; only PWM controls them.
 - **NTCs**: 3× Bykski B-PD5-TMR 10k probes on the Mega (T1, T2, T3). The cube NTC goes to the Apex.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
@@ -323,6 +325,7 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 - Fixed `P2_PWM_RUN` = 80 %. ASSUMED: higher duty = faster (verify in `09_pump2`).
 
 ### Sequences
+- With `V1_FITTED 0` every V1 step below is a no-op (SEN stays LOW) and V2 alone shuts the outdoor branch.
 - **Start**: park V2 (skipped if already parked) → PEN on + PWM → V1 open → RUN with rate-limited opening, fans at minimum.
 - **Stop** (Mode 1, sleep): V2 to bypass (park, overdrive) → P2 off → V1 off `V1_OFF_DELAY_MS` (10 s) later.
 - **Fault**: V1 off and P2 off immediately, V2 park in parallel (rev 1 order kept for faults — ASSUMED).
@@ -448,7 +451,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_REVERSE_DEADTIME_MS` = 500, `V2_CTRL_PERIOD_MS` = 10000, `V2_KP_OPEN/CLOSE_MS_PER_C` = 100 / 200,
   `V2_MAX_OPEN/CLOSE_PULSE_MS` = 500 / 1500 (TBD on the loop), `V2_START_LIMIT_MIN` = 5,
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
-- V1: `V1_OFF_DELAY_MS` = 10000
+- V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
 - Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
@@ -460,6 +463,8 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - `FREEZE_GUARD_C` = −20 (PROPOSAL, unused)
 
 ## Open items
+- OPEN: replacement for V1 (second 3-way?) — until then the outdoor branch has no fail-closed valve: on a fault it
+  shuts when V2 reaches the edge (at most ~0.7 s play + ~4 s from all ports open), not instantly.
 - OPEN: freeze guard behaviour (PROPOSAL, not implemented)
 - OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
 - Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to

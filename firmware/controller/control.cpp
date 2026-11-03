@@ -40,7 +40,7 @@ static void setFans(uint8_t pct) {
 
 static bool flowing() {
   // Without a home the angle is unknown: count it as flowing whenever P2 and V1 are on.
-  return hwPen() && hwSen() && (!valveHomed() || valveDeg() > V2_FLOW_DEG);
+  return hwPen() && hwV1Open() && (!valveHomed() || valveDeg() > V2_FLOW_DEG);
 }
 
 static bool feasibleOpen() {
