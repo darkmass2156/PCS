@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.9.1 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.1` |
 | 2026-11-04 | 0.9.0 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan header | rev11 | `fw-v0.9.0` |
 | 2026-11-04 | 0.8.4 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct + RC | rev11 | `fw-v0.8.4` |
 | 2026-11-04 | 0.8.3 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct | rev11 | `fw-v0.8.3` |
@@ -64,6 +65,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.1 — 2026-11-04: tach sampled instead of edge interrupts
+- Timer4 samples the tach pins every ~250 µs, a level change counts after 3 equal samples (`TACH_DEBOUNCE`).
+  Replaces the INT/PCINT edge filter: bench showed per-pulse rpm exactly 2:1 (667–1410) = single pulses lost when a
+  bounce on the slow RC edge was read as a rise. Same method in `05_fan_pwm_tach` (raw edges still printed).
 ## BENCH — 2026-11-04: `05_fan_pwm_tach` on the display
 - Duty, filtered rpm (big), raw rpm (red when far above filtered) and the live tach line level per fan on the 1.9"
   panel (CS 49, DC 53, RES 47, 4 MHz). Copies `fonts.h` / `scr_gfx.*` from the controller.

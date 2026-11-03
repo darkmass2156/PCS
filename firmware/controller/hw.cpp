@@ -60,30 +60,35 @@ bool hwV1Open() { return V1_FITTED ? hwSen() : true; }   // without V1 nothing b
 uint8_t hwFanPct() { return fanPct; }
 uint8_t hwPumpPct() { return pumpPct; }
 
-// Tach edge filter (bench 2026-11-04: the 25 kHz fan PWM couples onto the tach lines in the fan cables): an edge
-// counts only if the pin is still LOW when the ISR reads it and TACH_LOCKOUT_US have passed since the last one.
-// 3000 rpm at 2 pulses/rev = 10 ms between falling edges, so the 3 ms lockout never drops a real pulse.
-// Also the line must have been HIGH for TACH_HIGH_MIN_US before the falling edge: a glitch on a slow (RC-filtered)
-// transition has almost no HIGH time before it, a real pulse >= 5 ms (bench: without this the count doubled > 1000 rpm).
-static uint32_t lastF2, lastP, riseF2, riseP;
+// Tach input: Timer4 samples the tach pins every ~250 us (TACH_SAMPLE_US); a level change counts only after
+// TACH_DEBOUNCE samples in a row (~0.75 ms). Bench 2026-11-04: edge interrupts lost single pulses (a bounce on the slow
+// RC edge was read as a rise) and counted glitches; sampling rejects both. 3000 rpm = 5 ms per half, D5 ~4800 rpm
+// = 3.1 ms, so no real pulse is lost. Timer4 is free (Timer3 = PWM, Timer1/2 = LED, Timer0 = millis).
+struct TachDeb { bool high; uint8_t n; };
+static TachDeb debF2 = {true, 0}, debP = {true, 0};
 #if FAN1_TACH_FITTED
-static uint32_t lastF1, riseF1;
+static TachDeb debF1 = {true, 0};
 #endif
-static inline void tachEdge(bool high, uint32_t t, uint32_t &rise, uint32_t &last, volatile uint16_t &n) {
-  if (high) { rise = t; return; }
-  if (t - rise >= TACH_HIGH_MIN_US && t - last >= TACH_LOCKOUT_US) { n++; last = t; }
+static inline void tachSample(TachDeb &d, bool high, volatile uint16_t &pulses) {
+  if (high == d.high) { d.n = 0; return; }
+  if (++d.n < TACH_DEBOUNCE) return;
+  d.high = high;
+  d.n = 0;
+  if (!high) pulses++;
 }
+ISR(TIMER4_COMPA_vect) {
+  tachSample(debF2, PIND & _BV(PD2), pulsesF2);   // D19 = PD2
 #if FAN1_TACH_FITTED
-static void isrTach1() { tachEdge(PIND & _BV(PD3), micros(), riseF1, lastF1, pulsesF1); }   // D18 = PD3
+  tachSample(debF1, PIND & _BV(PD3), pulsesF1);   // D18 = PD3
 #endif
-static void isrTach2() { tachEdge(PIND & _BV(PD2), micros(), riseF2, lastF2, pulsesF2); }   // D19 = PD2
+  tachSample(debP, PINB & _BV(PB6), pulsesP);     // D12 = PB6
+}
 
-// D12 = PB6 = PCINT6 (fires on any change in the group).
-ISR(PCINT0_vect) {
-  static uint8_t prev = _BV(PB6);
-  uint8_t now = PINB & _BV(PB6);
-  if (now != prev) tachEdge(now, micros(), riseP, lastP, pulsesP);
-  prev = now;
+static void tachTimerInit() {   // Timer4 CTC, /64, OCR 62 -> 3968 Hz (252 us)
+  TCCR4A = 0;
+  TCCR4B = _BV(WGM42) | _BV(CS41) | _BV(CS40);
+  OCR4A = 62;
+  TIMSK4 = _BV(OCIE4A);
 }
 
 void hwInit() {
@@ -94,13 +99,7 @@ void hwInit() {
   pinMode(PIN_TACH1, INPUT_PULLUP);   // fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04), no LG 10k:
   pinMode(PIN_TACH2, INPUT_PULLUP);   // internal ~35k pull-up (an external 10k at the Mega end is still welcome)
   pinMode(PIN_PUMP_TACH, INPUT);
-#if FAN1_TACH_FITTED
-  attachInterrupt(digitalPinToInterrupt(PIN_TACH1), isrTach1, CHANGE);
-#endif
-  attachInterrupt(digitalPinToInterrupt(PIN_TACH2), isrTach2, CHANGE);
-  PCMSK0 = _BV(PCINT6);
-  PCIFR = _BV(PCIF0);
-  PCICR |= _BV(PCIE0);
+  tachTimerInit();
 
   pinMode(PIN_BTN1, INPUT);    // external 10k pull-ups + RC
   pinMode(PIN_BTN2, INPUT);

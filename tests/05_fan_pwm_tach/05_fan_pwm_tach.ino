@@ -7,9 +7,8 @@
 //   BTN2 long   duty 0 %
 // Serial: f<pct> fixed duty, s sweep.
 // LED: brightness follows the duty.
-// Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2: a falling edge counts only if the pin is
-// still LOW in the ISR, the line was HIGH for >= TACH_HIGH_MIN_US before it, and >= TACH_LOCKOUT_US have passed since
-// the last counted one. Raw >> filtered = noise / glitches on the tach lines.
+// Columns: duty | raw rpm1 rpm2 (every falling edge) | filtered rpm1 rpm2 (sampled + debounced, see below).
+// Raw >> filtered = noise / glitches on the tach lines.
 // "per pulse a-b": rpm from the longest and shortest pulse interval in that second. Narrow range (a few %) with a
 // jumping per-second value = counting window; max ~ 2x min = missed pulses; wide smooth range = the fan itself hunts.
 // iPPC-3000: ~3000 rpm max = 100 Hz falling edges (10 ms apart), so the 3 ms lockout never drops a real pulse.
@@ -25,32 +24,44 @@
 Adafruit_ST7789 tft(49, 53, 47);
 const int16_t W = 320;
 
-const uint16_t TACH_LOCKOUT_US = 3000, TACH_HIGH_MIN_US = 1000;
+// raw: every falling edge (INT on D18/D19). filtered: Timer4 samples both pins every ~250 us; a level change counts
+// only after TACH_DEBOUNCE samples in a row (~0.75 ms). Glitches and bounces shorter than that vanish, no real pulse
+// is lost (3000 rpm = 5 ms per half). Same as the firmware (FW 0.9.x hw.cpp).
+const uint8_t TACH_DEBOUNCE = 3;
 volatile uint16_t p1, p2, f1, f2;
-volatile uint32_t last1, last2, rise1, rise2;
-volatile uint32_t min1 = 0xFFFFFFFF, max1, min2 = 0xFFFFFFFF, max2;   // interval between counted edges, us
-// D18 = PD3 (INT3), D19 = PD2 (INT2); interrupts on CHANGE
-void isr1() {
-  uint32_t t = micros();
-  if (PIND & _BV(PD3)) { rise1 = t; return; }
-  p1++;
-  if (t - rise1 >= TACH_HIGH_MIN_US && t - last1 >= TACH_LOCKOUT_US) {
-    uint32_t iv = t - last1;
-    if (iv < min1) min1 = iv;
-    if (iv > max1) max1 = iv;
-    f1++; last1 = t;
-  }
+volatile uint32_t last1, last2;
+volatile uint32_t min1 = 0xFFFFFFFF, max1, min2 = 0xFFFFFFFF, max2;   // interval between counted pulses, us
+void isr1() { p1++; }
+void isr2() { p2++; }
+
+struct Deb { bool high; uint8_t n; };
+Deb d1 = {true, 0}, d2 = {true, 0};
+// true on a debounced HIGH -> LOW change
+inline bool debounce(Deb &d, bool high) {
+  if (high == d.high) { d.n = 0; return false; }
+  if (++d.n < TACH_DEBOUNCE) return false;
+  d.high = high;
+  d.n = 0;
+  return !high;
 }
-void isr2() {
+inline void counted(uint32_t t, volatile uint32_t &last, volatile uint32_t &mn, volatile uint32_t &mx,
+                    volatile uint16_t &f) {
+  uint32_t iv = t - last;
+  if (iv < mn) mn = iv;
+  if (iv > mx) mx = iv;
+  last = t;
+  f++;
+}
+ISR(TIMER4_COMPA_vect) {
   uint32_t t = micros();
-  if (PIND & _BV(PD2)) { rise2 = t; return; }
-  p2++;
-  if (t - rise2 >= TACH_HIGH_MIN_US && t - last2 >= TACH_LOCKOUT_US) {
-    uint32_t iv = t - last2;
-    if (iv < min2) min2 = iv;
-    if (iv > max2) max2 = iv;
-    f2++; last2 = t;
-  }
+  if (debounce(d1, PIND & _BV(PD3))) counted(t, last1, min1, max1, f1);   // D18
+  if (debounce(d2, PIND & _BV(PD2))) counted(t, last2, min2, max2, f2);   // D19
+}
+void timer4Init() {   // CTC, /64, OCR 62 -> 3968 Hz (252 us)
+  TCCR4A = 0;
+  TCCR4B = _BV(WGM42) | _BV(CS41) | _BV(CS40);
+  OCR4A = 62;
+  TIMSK4 = _BV(OCIE4A);
 }
 
 uint8_t duty;
@@ -127,8 +138,9 @@ void setup() {
   ICR3 = 639;
   pinMode(18, INPUT_PULLUP);   // straight PW -> Mega since 2026-11-04: external 10k + 100 nF at the Mega, internal on too
   pinMode(19, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(18), isr1, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(19), isr2, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(18), isr1, FALLING);
+  attachInterrupt(digitalPinToInterrupt(19), isr2, FALLING);
+  timer4Init();
   Serial.begin(115200);
   benchBanner(F("05_fan_pwm_tach"));
   initPanel();

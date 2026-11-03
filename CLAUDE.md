@@ -106,7 +106,7 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D2 | FAN_PWM | OC3B, 25 kHz |
 | D3 | PUMP_PWM | OC3C, 25 kHz |
 | D9 / D10 / D11 | LED R / B / G | common-cathode RGB, analogWrite (Timer2 / Timer1). As built G and B are swapped vs the pinout doc (green die on D11, blue on D10, bench 2026-11-03); `PIN_LED_G/B` and `bench.h` follow the build |
-| D12 | PUMP_TACH | not an INT pin → PCINT6 (PCINT0 group) |
+| D12 | PUMP_TACH | PB6, sampled by Timer4 (no interrupt) |
 | D18 | TACH1 | **unused** (`FAN1_TACH_FITTED 0`, FAN1 header dropped 2026-11-04). Was straight from PW C22 |
 | D19 | TACH2 | INT2. Straight from PW D22 (LINK 4 off LG A6, H5·3 empty), 10k to 5V + 100 nF to GND at the Mega, internal pull-up on |
 | D20 / D21 | SDA / SCL | 4.7k pull-ups to 5V |
@@ -159,15 +159,15 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
     `NTC_FLOAT_DELTA` (40) is floating (broken ribbon / housing between LG and Mega) and is treated as open. Without it
     a floating pin returns a plausible fake temperature (bench 2026-11-01: T2 stuck at ~17.5 °C).
 - **Fuse sense**: compare against thresholds with hysteresis (see Tunables). Binary present/absent check.
-- **Tach**: open-collector, 2 pulses/rev. Fans: internal pull-up (wired straight to the Mega), planned 10k to 5V +
-  10 nF to GND at the Mega pins and 1k in series in FAN_PWM (bench 2026-11-04: the 25 kHz PWM couples onto the tach
-  in the fan cables, ~25k edges/s). P2: 10k on LG. Edge filter in the ISRs: counts only if the pin is still LOW and
-  `TACH_LOCKOUT_US` (3 ms) after the last counted edge, and the line was HIGH ≥ `TACH_HIGH_MIN_US` (1 ms) before it
-  (CHANGE interrupts; 3000 rpm = 10 ms period, D5 ~4800 rpm = 12.5 ms). Fitted 2026-11-04: 10k + 100 nF at D18/D19,
-  1k in FAN_PWM.
+- **Tach**: open-collector, 2 pulses/rev. Fan (D19): wired straight from PW U21, 1k in series, 10k to 5V + 100 nF to
+  GND on the fan side of the 1k, internal pull-up on. P2 (D12): 10k on LG. **Sampled, not edge-triggered** (FW 0.9.1):
+  Timer4 reads D19 / D12 (and D18 if fitted) every ~250 µs; a level change counts only after `TACH_DEBOUNCE` (3)
+  samples in a row. Bench 2026-11-04: edge interrupts counted glitches and lost single pulses (per-pulse rpm showed
+  exactly 2:1); 3000 rpm = 5 ms per half, D5 ~4800 rpm = 3.1 ms. Timer4 is reserved for this.
+  FAN_PWM has only a 1k in series (nothing to GND / 5V: a cap there smooths the 25 kHz PWM into DC).
 - **PWM**: Timer3, fast PWM mode 14, no prescaler, ICR3 = 639 → 25 kHz.
   - 0 % disconnects the compare output and holds the pin LOW (OCR = 0 still gives a 62 ns spike).
-  - Use no libraries that take Timer3. Leave Timer1 and Timer2 alone (they drive the LED).
+  - Use no libraries that take Timer3. Leave Timer1 and Timer2 alone (they drive the LED), and Timer4 (tach sampling).
 - **SHT31 ×2**: A = 0x44 (top-rear, near CPU) and B = 0x45 (mid-case, near GPU/RAM). Hardware I2C at 50 kHz,
   `Wire.setWireTimeout(25000, true)`; after a timeout the bus is recovered (9 SCL pulses, STOP, Wire restart).
   Check the CRC on every read. **AL/ALERT pins unconnected** on all SHT3x: 5V on AL shorts the output and heats
@@ -465,7 +465,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
-- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_LOCKOUT_US` = 3000, `TACH_HIGH_MIN_US` = 1000, `FAN1_TACH_FITTED` = 0
+- Fans: `FAN_PWM_MIN` = 20 (TBD), `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 0
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = 0.0, valid −40…+80 °C

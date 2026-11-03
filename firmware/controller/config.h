@@ -13,7 +13,7 @@
 #define PIN_LED_R     9
 #define PIN_LED_G     11   // as built: green die on D11, blue on D10 (bench 2026-11-03, Mode 2 breathed green)
 #define PIN_LED_B     10
-#define PIN_PUMP_TACH 12   // PCINT6
+#define PIN_PUMP_TACH 12   // PB6, sampled by Timer4
 #define PIN_TACH1     18   // INT3
 #define PIN_TACH2     19   // INT2
 #define PIN_VO        22
@@ -97,8 +97,7 @@
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
 #define FAN1_TACH_FITTED 0       // 0: one fan header (FAN2, D19) + Y-splitter, only that tach is read (2026-11-04)
-#define TACH_LOCKOUT_US  3000UL   // tach edge filter: min time between counted edges (3000 rpm = 10 ms)
-#define TACH_HIGH_MIN_US 1000UL   // ... and the line HIGH at least this long before a counted falling edge
+#define TACH_DEBOUNCE    3        // tach: samples (~250 us each, Timer4) a new level must hold before it counts
 #define FAN_STALL_MS     5000UL
 
 // ---------------- Fuse sense / 12V ----------------
