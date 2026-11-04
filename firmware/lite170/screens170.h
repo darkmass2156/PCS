@@ -4,7 +4,7 @@
 //   Mode 2 sport     - graphite, slanted numbers and segment bars, dew shift lights in the header
 //   Mode 3 engineer  - grey, P&ID, raw table (incl. case/room), sweeping T2/Tset/DP chart
 // Non-blocking: update() does one small step (a clear strip, a static chunk or one changed widget).
-// Canonical in firmware/controller/ (DISPLAY_VARIANT 2); firmware/lite170 and tests/11_ui_dev hold copies.
+// Canonical in firmware/controller/ (the only layout since FW 0.9.3); firmware/lite170 and tests/11_ui_dev hold copies.
 #include "scr_data.h"
 #include "scr_gfx.h"
 
@@ -16,6 +16,7 @@ class Screens170 {
   void update(uint32_t now, const UiData &d);   // switches screen when d.mode changes
   void sample(const UiData &d);                 // call at 1 Hz: chart history (kept in every mode)
   void redraw() { mode = 0; }                   // screen was overwritten (e.g. splash): rebuild it fully
+  void repaint();                               // redraw every value in place (no clear): self-heal, invisible
 
  private:
   enum Phase : uint8_t { CLEAR, STATIC, CHART, LIVE };

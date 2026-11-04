@@ -27,6 +27,9 @@ static NtcChan ntc[3] = {
 };
 static uint32_t ntcAt;
 
+// Serial SIM overrides (bench only): 0..2 = T1..T3, 3 = T_room. NAN = live value.
+static float ovr[4] = {NAN, NAN, NAN, NAN};
+
 static float ntcToC(float adc) {
   if (adc < NTC_ADC_SHORT || adc > NTC_ADC_OPEN) return NAN;   // short / open
   float r = NTC_R_PULLUP * adc / (1023.0f - adc);
@@ -42,7 +45,8 @@ static float ntcToC(float adc) {
 static void ntcUpdate(uint32_t now) {
   if (now - ntcAt < 100) return;
   ntcAt = now;
-  for (NtcChan &ch : ntc) {
+  for (uint8_t k = 0; k < 3; k++) {
+    NtcChan &ch = ntc[k];
     analogRead(ch.pin);                 // settle the mux
     uint16_t sum = 0;
     for (uint8_t i = 0; i < 4; i++) sum += analogRead(ch.pin);
@@ -61,6 +65,7 @@ static void ntcUpdate(uint32_t now) {
     ch.adcF += (adc - ch.adcF) / 8.0f;  // ~0.8 s time constant at 10 Hz
     float c = openShort ? NAN : ntcToC(ch.adcF);
     if (!isnan(c) && !NTC_TRIMPOT_SIM) c += ch.offset;
+    if (!isnan(ovr[k])) { c = ovr[k]; floating = false; }   // serial SIM override
     NtcReading &o = *ch.out;
     o.c = c;
     o.adc = ch.adcF;
@@ -186,6 +191,7 @@ static void shtUpdate(uint32_t now) {
     uint8_t d[6];
     bool ok = shtTrigOk[i] && busRead(i, d, 6);
     shtResult(i, ok, d);
+    if (i == SHT_R && !isnan(ovr[3]) && sht[SHT_R].valid) sht[SHT_R].t = ovr[3];   // SIM: T only, DP stays real
   }
 }
 
@@ -252,4 +258,11 @@ void sensorsInit() {
 void sensorsUpdate(uint32_t now) {
   ntcUpdate(now);
   shtUpdate(now);
+}
+
+void sensorsSetOverride(uint8_t idx, float v) { if (idx < 4) ovr[idx] = v; }
+float sensorsOverride(uint8_t idx) { return idx < 4 ? ovr[idx] : NAN; }
+bool sensorsOverrideActive() {
+  for (float v : ovr) if (!isnan(v)) return true;
+  return false;
 }

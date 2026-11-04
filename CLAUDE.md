@@ -10,7 +10,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 | Hardware | **6b** (PW + LG boards, display RES on D47, 1.9" display, SHT30 header) | this file; change note `docs/changes/hw_rev6b.md`; BOM `docs/build_component_list_rev4b.xlsx` (rev 4b) |
 | Schematic | rev11 | `docs/schematics/full_loop_schematic_rev11.png` |
 | Control logic | rev 2 | this file → Control; change note `docs/changes/logic_rev2.md` |
-| Display software | rev 9 (1.9" 320x170 layouts, Pingu crashes into ROG, AA fonts, fan-alarm and test banners, one fan tach) | this file → Display; `DISPLAY_REV` in `version.h` |
+| Display software | rev 10 (1.9" 320x170 only, Pingu crashes into ROG, AA fonts, fan-alarm and test banners, one fan tach, flash-free self-heal) | this file → Display; `DISPLAY_REV` in `version.h` |
 | Firmware | see `firmware/controller/version.h` | `CHANGELOG.md` |
 
 ### How revisions are tracked
@@ -36,9 +36,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - Every bench test is driven by **BTN1/BTN2** (breadboard buttons to GND work: tests use INPUT_PULLUP);
   the button map is in the sketch header and printed at boot. Serial commands stay as a backup.
 - Shared bench code is `tests/common/bench.h` (canonical, `BENCH_VERSION`); each test folder holds an
-  identical copy. Same for `softi2c.*` and the display files `fonts.h`, `scr_gfx.*`, `scr_data.h`, `screens.*`, `splash.h`,
+  identical copy. Same for `softi2c.*` and the display files `fonts.h`, `scr_gfx.*`, `scr_data.h`, `splash.h`,
   `boot_sprite.h`, `rog_logo.h`, `screens170.*` (all canonical in `firmware/controller/`, copied into
-  `tests/11_ui_dev`, and except `screens.*` into `firmware/lite170`; `fonts.h` and `scr_gfx.*` also into
+  `tests/11_ui_dev` and `firmware/lite170`; `fonts.h` and `scr_gfx.*` also into
   `tests/12_disp170_sht31` and `tests/05_fan_pwm_tach`). `bench.h` is copied into `firmware/lite170` too.
 - If a library is needed, name it exactly as it appears in Library Manager so Vlad can install it.
   Current list: **Adafruit ST7735 and ST7789 Library**, **Adafruit GFX Library** (+ its dependency Adafruit BusIO).
@@ -83,8 +83,8 @@ coolant entering the PC must never drop below in-case dew point + margin.
 - **NTCs**: 3× Bykski B-PD5-TMR 10k probes on the Mega (T1, T2, T3). The cube NTC goes to the Apex.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
   because 0x44/0x45 are taken). SHT30 powered from the Mega header 5V/GND; no board change.
-- **Display**: one ST7789 IPS screen in the case (see Display), mounted landscape. Rev 6b: the **1.9" 170x320**
-  (320x170 landscape, `DISPLAY_VARIANT 2`). The 1.69" 280x240 (variant 1) layouts stay in the code.
+- **Display**: one ST7789 IPS screen in the case (see Display), mounted landscape: the **1.9" 170x320**
+  (320x170 landscape). The 1.69" 280x240 variant was dropped in FW 0.9.3 (Vlad 2026-11-04; history in git).
   BLK not connected (backlight always on). The 0.91" I2C OLEDs are **not** used.
 - **Top panel**: 570X buttons BTN1 and BTN2, plus an RGB status LED under the power button.
   Button 3 and the power button go to the Apex, not the Mega.
@@ -194,8 +194,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   **Set 0 before flashing the real controller.**
 - **Landscape** (display rev 1): `DISP_ROTATION 1` (3 if mounted upside down). `init()` takes the panel's native
   portrait size (240x280), the rotation turns it into 280x240.
-- **Variant**: `DISPLAY_VARIANT 2` (default, rev 6b) = 1.9" 170x320 → **320x170** landscape, `screens170.*`
-  (layouts as in the Lite build below). `DISPLAY_VARIANT 1` = 1.69" MSP1691, **280x240**, `screens.*`.
+- **Panel**: 1.9" 170x320 → **320x170** landscape, layouts in `screens170.*` (as in the Lite build below).
+  `tests/06_display` still has its own 1.69" mode for reference.
 - **Library**: Adafruit_ST7789 + Adafruit_GFX. Use `init(240, 280)` or `init(170, 320)`; the library handles the panel offsets.
 - **Field report (1.69", one buyer)**: Adafruit with `init(240, 280)` worked. Fallbacks (`config.h`):
   - red and blue swapped → `DISP_BGR 1`
@@ -213,8 +213,9 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   the screens redraw only widgets whose content changed, one widget per loop pass, text with background colour
   and segment digits by changed segment, so nothing flickers. A mode change clears the screen (in strips) and
   rebuilds it over a few passes — the only full-screen fills besides the boot sequence.
-- **Self-heal**: non-blocking re-init (SWRESET keeps GRAM, so no blank) every 5 min, then a full redraw (the same
-  rebuild as a mode change) that repairs any corrupted pixels. A small dot in the header toggles every second
+- **Self-heal** (display rev 10): every 5 min a non-blocking soft re-init (COLMOD, NORON, DISPON, then orientation /
+  inversion; no SWRESET or SLPOUT, which blank the panel ~300 ms) and an in-place repaint of every value widget (no
+  clearing). Invisible; the old full redraw every 5 min was the "refresh" seen on the bench (2026-11-04). A small dot in the header toggles every second
   (no clock). The RGB LED stays the authoritative status.
 - `SPI_DEFAULT_FREQ` (library init speed, 8 MHz on AVR) is a `#define` inside the library .cpp and can't be set
   from the sketch; the firmware re-sends the whole init sequence at `DISP_SPI_HZ` right after `init()` instead.
@@ -262,8 +263,7 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   prints flash/RAM. Sketch code with `-Wall -Wextra`. Run it before handing over a build.
 - **Tools**: `tests/11_ui_dev` runs the real screens and boot sequence on the panel with fake data (buttons switch
   mode/scenario). One penguin per startup, then the UI, picked like the firmware (random from
-  ADC noise, never the last one shown, EEPROM addr 3); BTN2 long or serial `s` / `p0` `p1` `p2` for the others. `tools/ui_preview/run.sh` renders the same code on the host into `docs/display/preview_*.png`
-  (and lite170 into `preview170_*.png`)
+  ADC noise, never the last one shown, EEPROM addr 3); BTN2 long or serial `s` / `p0` `p1` `p2` for the others. `tools/ui_preview/run.sh` renders the same code on the host into `docs/display/preview170_*.png`
   (look-alike 5x7 font; AA fonts, layout and colours exact; SPI time modelled at 2 MHz for the boot timeline).
 
 ## Hydraulics (matches rev11 schematic)
@@ -400,8 +400,15 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 - Serial events (`#` lines): state / mode changes from boot; at the end of the boot grace (10 s) every active
   fault and alarm by name, then each one as it turns ON / off — to match the LED to a cause.
 - Serial input (line based: CR/LF or 50 ms of silence ends a command):
-  - `?` prints version, tunables, a status line (incl. I2C recoveries), the NTC inputs, a room SHT30
-    probe (D34/D36 idle levels, 0x44/0x45 ACK as wired and swapped) and all active faults/alarms. `h` = help.
+  - `?` prints version, tunables, reset counters, SIM overrides, a status line (incl. I2C recoveries), the NTC inputs,
+    a room SHT30 probe (D38/D40 idle levels, 0x44/0x45 ACK as wired and swapped) and all active faults/alarms.
+    `h` = help. `m1` / `m2` / `m3` = mode, exactly as the buttons (also acknowledges faults whose cause is gone).
+  - **SIM overrides** (FW 0.9.3): `T1=..` `T2=..` `T3=..` `TR=..` (room T, needs a valid SHT30; its DP stays real)
+    `DP=..` force a value into the control logic; `T2=` clears one, `clr` all, auto-clear after `TEST_TIMEOUT_MS`
+    (30 min). Every fault and limit sees the forced value (e.g. `T2=5` with P2 on trips T2 LOW). SIM shows on the
+    display and in `?`. For dry runs of the fault paths and the regulation; never leave one on the real loop.
+  - **Reset counters**: EEPROM 4..7 count watchdog / brown-out / external / power-on resets (saturating); printed at
+    boot and in `?`, `rc` clears them. To tell a watchdog hang from a 5V dip from a DTR reset.
   - **Serial test mode** (FW 0.7.0, state `TEST`): `t` enters it, only from Mode 1 at idle with 12V and no fault.
     `f<0-100>` fans %, `p<0-100>` P2 % (`p0` = PEN off), `v1`/`v0` V1, `o<ms>`/`c<ms>` V2 timed run (max 15 s, no
     edge logic), `k` park, `s` stop V2. Every command echoes a `# TEST …` line. All faults stay armed (T2/T1 low with
@@ -419,7 +426,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 5. `04_buttons_led` — short and long press
 6. `05_fan_pwm_tach` — duty on the buttons, raw vs filtered rpm per fan, also on the 1.9" display (filtered rpm big,
    raw rpm, live tach line level)
-7. `06_display` — run it on both variants via `DISPLAY_VARIANT`
+7. `06_display` — panel check (still has the old 1.69" mode via its own `DISPLAY_VARIANT`)
 8. `07_valve` — direction, t_full open/close, backlash, homing
 9. `08_solenoid`
 10. `09_pump2`
@@ -458,7 +465,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 5. **K_POT**: later, on the real loop.
 
 ## Tunables (`config.h`)
-- Display: `DISPLAY_VARIANT` = 2, `DISP_TARGET_ILI9341_SIM` = 0, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
+- Display: `DISP_TARGET_ILI9341_SIM` = 0, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
   `BOOT_SPLASH` = 1
 - Setpoint and margins:
   - `MARGIN_DP_C` = 4.0, `DELTA_ROOM_C` (δ) = 3.0 (TBD, bench check 1), `MODE2_FALLBACK_C` = 20.0
@@ -484,8 +491,8 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - `FREEZE_GUARD_C` = −20 (PROPOSAL, unused)
 
 ## Open items
-- OPEN: replacement for V1 (second 3-way?) — until then the outdoor branch has no fail-closed valve: on a fault it
-  shuts when V2 reaches the edge (at most ~0.7 s play + ~4 s from all ports open), not instantly.
+- Decided (Vlad 2026-11-04): run without V1 for now; a replacement can come later. The outdoor branch has no
+  fail-closed valve: on a fault it shuts when V2 reaches the edge (at most ~0.7 s play + ~4 s from all ports open).
 - OPEN: freeze guard behaviour (PROPOSAL, not implemented)
 - OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
 - Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to

@@ -29,7 +29,6 @@
 #define PIN_DISP_DC   53
 
 // ---------------- Display ----------------
-#define DISPLAY_VARIANT 2          // 2 = 1.9" 170x320 (320x170 landscape, rev 6b, screens170.*); 1 = 1.69" 280x240 (screens.*)
 #define DISP_SPI_HZ     4000000UL
 // Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
 // MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
@@ -46,7 +45,7 @@
 #endif
 #define DISP_ROTATION   1          // landscape; 3 = landscape upside down
 #define BOOT_SPLASH     1          // penguin "noot noot" splash at boot (non-blocking, ~3 s)
-#define DISP_REINIT_MS  300000UL   // self-heal on the 1.5 m run: re-send the init sequence, then redraw everything
+#define DISP_REINIT_MS  300000UL   // self-heal on the 1.5 m run: re-send the state commands, repaint values in place
 
 // ---------------- Setpoint and margins (°C) ----------------
 #define MARGIN_DP_C        4.0f

@@ -69,3 +69,8 @@ bool controlTesting();
 void controlTestFan(uint8_t pct);
 void controlTestPump(uint8_t pct);   // 0 = PEN off
 void controlTestV1(bool open);
+
+// Serial SIM: DP override (NAN clears); controlSimActive() = any sensor or DP override set (shown as SIM).
+void controlSetDpOverride(float dp);
+float controlDpOverride();
+bool controlSimActive();

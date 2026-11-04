@@ -29,3 +29,9 @@ void sensorsRoomDiag();             // '?' only: SHT30 bus levels + 0x44/0x45 pr
 // Max of the valid dew points; returns NAN and count 0 if none.
 float dewPointMax(uint8_t &validCount, float &spread);
 float dewPointMagnus(float t, float rh);
+
+// Serial SIM overrides (bench): idx 0..2 = T1..T3 (replaces the NTC value), 3 = T_room (needs a valid SHT30; its DP
+// stays real). NAN clears. The control logic and all faults see the overridden value.
+void sensorsSetOverride(uint8_t idx, float v);
+float sensorsOverride(uint8_t idx);
+bool sensorsOverrideActive();

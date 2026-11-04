@@ -1,7 +1,7 @@
 // 11_ui_dev — the real dashboard screens and boot sequence on the panel, fed with fake data.
-// DISPLAY_VARIANT 2: 1.9" 320x170 (rev 6b, screens170.*), 1: 1.69" 280x240 (screens.*, also the Wokwi panel).
+// 1.9" 320x170 (rev 6b, screens170.*).
 // Libraries: "Adafruit ST7735 and ST7789 Library", "Adafruit GFX Library". Copies here (canonical in
-// firmware/controller/): fonts.h, scr_gfx.*, scr_data.h, screens.*, screens170.*, splash.h, boot_sprite.h,
+// firmware/controller/): fonts.h, scr_gfx.*, scr_data.h, screens170.*, splash.h, boot_sprite.h,
 // rog_logo.h. Host preview of the same code: tools/ui_preview/run.sh. RES on D47 (rev 6b), 4 MHz.
 //
 // Buttons:
@@ -20,7 +20,6 @@
 #include <Adafruit_ST7789.h>
 #include "bench.h"
 
-#define DISPLAY_VARIANT 2   // 2 = 1.9" 320x170, 1 = 1.69" 280x240
 #define DISP_ROTATION 1     // 3 = landscape upside down
 #define DISP_TARGET_ILI9341_SIM 0   // same switch as config.h: 1 = Wokwi ILI9341 (variant 1 only), 0 = real ST7789
 #if DISP_TARGET_ILI9341_SIM
@@ -34,15 +33,9 @@
 #endif
 
 #include "splash.h"
-#if DISPLAY_VARIANT == 2
 #include "screens170.h"
-const uint16_t IW = 170, IH = 320, W = 320, H = 170;
+const uint16_t IW = 170, IH = 320, W = 320, H = 170;   // 1.9" only (the 280x240 variant was dropped in FW 0.9.3)
 Screens170 screens;
-#else
-#include "screens.h"
-const uint16_t IW = 240, IH = 280, W = 280, H = 240;
-Screens screens;
-#endif
 Adafruit_ST7789 tft(49, 53, 47);   // RES on D47 (rev 6b)
 BootSplash splash;
 UiData d;
@@ -126,11 +119,7 @@ void setup() {
   if (last < SPLASH_COUNT && penguin == last) penguin = (penguin + 1 + random(SPLASH_COUNT - 1)) % SPLASH_COUNT;
   Serial.print(F("seed 0x")); Serial.println(seed, HEX);
   initPanel();
-#if DISPLAY_VARIANT == 2
   screens.begin(&tft, "ui-dev");
-#else
-  screens.begin(&tft, W, H, "ui-dev");
-#endif
   scenario();
   boot();
 }

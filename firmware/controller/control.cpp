@@ -19,6 +19,7 @@ static uint8_t seqStep, fanPct = FAN_PWM_MIN;
 static uint8_t testFan, testPump;
 static bool testV1;
 static uint32_t testAt;
+static float dpOverride = NAN;
 
 // ---------------- helpers ----------------
 static void enter(BranchState s, uint32_t now) {
@@ -55,6 +56,11 @@ static void parkIfNeeded() {
 static void updateDerived(uint32_t now) {
   float spread;
   st.dp = dewPointMax(st.dpValid, spread);
+  if (!isnan(dpOverride)) {          // serial SIM override
+    st.dp = dpOverride;
+    if (!st.dpValid) st.dpValid = 1;
+    spread = 0;
+  }
 
   uint16_t a = st.alarms & (A_FUSE_FAN | A_FAN1_STALL | A_FAN2_STALL | A_FEAS_FORCED);
   bool grace = now - bootAt < BOOT_GRACE_MS;
@@ -407,3 +413,7 @@ bool controlTesting() { return st.state == ST_TEST; }
 void controlTestFan(uint8_t pct) { testFan = pct > 100 ? 100 : pct; testAt = millis(); }
 void controlTestPump(uint8_t pct) { testPump = pct > 100 ? 100 : pct; testAt = millis(); }
 void controlTestV1(bool open) { testV1 = open; testAt = millis(); }
+
+void controlSetDpOverride(float dp) { dpOverride = dp; }
+float controlDpOverride() { return dpOverride; }
+bool controlSimActive() { return sensorsOverrideActive() || !isnan(dpOverride); }

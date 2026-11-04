@@ -111,6 +111,11 @@ static uint16_t stripBg(uint8_t kind) {
 }
 
 // ---------------- frame ----------------
+void Screens170::repaint() {
+  if (phase != LIVE) return;           // a rebuild is running anyway
+  memset(cache, 0, sizeof(cache));     // every widget differs -> redrawn one per pass, background-filled, no flicker
+}
+
 void Screens170::begin(Adafruit_ST7789 *t, const char *version) {
   gfx = t;
   ver = version;
