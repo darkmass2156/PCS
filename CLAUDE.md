@@ -430,6 +430,9 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
     of both LED schemes.
 15. `14_led_colors` — LED colour map: COLORS (firmware colours, both schemes, with gains), MIX (raw R/G/B on the
     buttons), GAIN (white balance, prints `LED_GAIN_R/G/B` defines), SWEEP (hue wheel). BTN1 long = next page.
+16. `15_cal_all` — all six temperature sensors (NTC T1–T3, SHT A/B/R) in the same air: BTN1 long = 10 min raw
+    average, reference = median of the three SHTs, prints `NTC_OFFSET_T1..3`, `SHT_T_OFFSET_*`, `SHT_RH_OFFSET_*`.
+    Offset only (Beta stays ASSUMED until the `01_ntc` two-point run).
 
 ### Trimpot test build
 - `NTC_TRIMPOT_SIM 1` in `config.h`: T1/T2/T3 are 3296W 10k trimpots as rheostats (wiper + one end) in the

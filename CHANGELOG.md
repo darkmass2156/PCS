@@ -66,6 +66,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## BENCH — 2026-11-04: `15_cal_all`
+- New sketch: one 10 min run averages all three NTCs and all three SHTs side by side and prints every offset against
+  the median of the SHTs (T and RH) as `config.h` lines.
 ## FW 0.9.1 — 2026-11-04: tach sampled instead of edge interrupts
 - Timer4 samples the tach pins every ~250 µs, a level change counts after 3 equal samples (`TACH_DEBOUNCE`).
   Replaces the INT/PCINT edge filter: bench showed per-pulse rpm exactly 2:1 (667–1410) = single pulses lost when a
