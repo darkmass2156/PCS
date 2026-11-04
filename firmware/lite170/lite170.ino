@@ -23,7 +23,7 @@
 #include "splash.h"
 #include "screens170.h"
 
-#define LITE_VERSION "lite 1.7"
+#define LITE_VERSION "lite 1.8"
 #define TFT_RST 47          // rev 6b: RES on D47 through C5 pin 3 (680 Ω to GND on LG, so -1 = black screen)
 #define DISP_SPI_HZ 4000000UL   // 1.5 m C4 cable with 330/660 dividers: OK up to 6 MHz
 #define DISP_INVERT 1
@@ -31,10 +31,10 @@
 #define DISP_ROTATION 1     // 3 = landscape upside down
 #define BOOT_SPLASH 1
 #define DISP_REINIT_MS 300000UL
-#define SHT_RH_OFFSET_A  1.3f   // calibration as config.h (2026-11-03, median of three): % RH
-#define SHT_RH_OFFSET_B  0.0f
-#define SHT_T_OFFSET_A   1.06f  // °C
-#define SHT_T_OFFSET_B   0.0f
+#define SHT_RH_OFFSET_A  0.50f  // calibration as config.h (15_cal_all 2026-11-04)
+#define SHT_RH_OFFSET_B -0.38f
+#define SHT_T_OFFSET_A   0.44f  // °C
+#define SHT_T_OFFSET_B   0.00f
 const uint16_t W = 320, H = 170;
 
 Adafruit_ST7789 tft(49, 53, TFT_RST);

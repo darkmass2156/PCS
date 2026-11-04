@@ -21,10 +21,10 @@
 SoftI2C bus2(38, 40);   // SHT30 straight on the Mega header (FW 0.7.1)
 
 // Calibration offsets, as config.h SHT_T_OFFSET_* (°C) and SHT_RH_OFFSET_* (% RH): each sensor pulled to the median of
-// the three (2026-11-03). Set them all to 0 to see raw readings.
+// the three SHTs (15_cal_all 2026-11-04). Set them all to 0 to see raw readings.
 struct Dev { const char *name; uint8_t addr; bool soft; float tOfs, rhOfs; uint16_t nack, crc; };
-Dev devs[3] = {{"A 0x44", 0x44, false, 1.06f, 1.3f, 0, 0}, {"B 0x45", 0x45, false, 0.0f, 0.0f, 0, 0},
-               {"R soft", 0x44, true, -0.13f, -0.2f, 0, 0}};
+Dev devs[3] = {{"A 0x44", 0x44, false, 0.44f, 0.50f, 0, 0}, {"B 0x45", 0x45, false, 0.0f, -0.38f, 0, 0},
+               {"R soft", 0x44, true, -0.32f, 0.0f, 0, 0}};
 uint16_t periodMs = 2000;
 
 const uint32_t CAL_S = 600;

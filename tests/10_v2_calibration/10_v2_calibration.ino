@@ -23,7 +23,7 @@
 
 // ---- copy these from firmware/controller/config.h ----
 const float NTC_BETA = 3435.0f;
-const float NTC_OFFSET_T1 = 0.0f, NTC_OFFSET_T2 = 0.0f, NTC_OFFSET_T3 = 0.0f;
+const float NTC_OFFSET_T1 = -0.15f, NTC_OFFSET_T2 = 0.67f, NTC_OFFSET_T3 = 0.54f;
 const uint8_t P2_PWM_RUN = 80;
 // ------------------------------------------------------
 const float T2_FLOOR_C = 15.0f;          // used when no SHT31 answers
@@ -80,9 +80,9 @@ float dpFrom(uint8_t addr) {
   if (Wire.requestFrom(addr, (uint8_t)6) != 6) return NAN;
   uint8_t b[6];
   for (uint8_t i = 0; i < 6; i++) b[i] = Wire.read();
-  float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f + (addr == 0x44 ? 1.06f : 0.0f);
+  float t = -45.0f + 175.0f * (uint16_t)((b[0] << 8) | b[1]) / 65535.0f + (addr == 0x44 ? 0.44f : 0.0f);
   float rh = 100.0f * (uint16_t)((b[3] << 8) | b[4]) / 65535.0f;
-  rh = constrain(rh + (addr == 0x44 ? 1.3f : 0.0f), 0.0f, 100.0f);   // calibration, as config.h SHT_T/RH_OFFSET_A/B
+  rh = constrain(rh + (addr == 0x44 ? 0.50f : -0.38f), 0.0f, 100.0f);   // calibration, as config.h SHT_T/RH_OFFSET_A/B
   if (rh < 1) return NAN;
   float g = log(rh / 100.0f) + 17.62f * t / (243.12f + t);
   return 243.12f * g / (17.62f - g);

@@ -47,10 +47,10 @@
 #define SENSORS 2           // 1 = one sensor, 2 = A and B
 #define LOG_INTERVAL_S 60   // night log: seconds per sample (1016 samples: 60 s = 16.9 h, 90 s = 25 h)
 #define SINGLE_ADDR 0x44    // SENSORS 1: address at boot (0x44 ADDR to GND, 0x45 ADDR to VIN)
-#define SHT_RH_OFFSET_A  1.3f   // calibration as config.h (2026-11-03, median of three). Raw ticks stay raw.
-#define SHT_RH_OFFSET_B  0.0f
-#define SHT_T_OFFSET_A   1.06f  // °C
-#define SHT_T_OFFSET_B   0.0f
+#define SHT_RH_OFFSET_A  0.50f  // calibration as config.h (15_cal_all 2026-11-04)
+#define SHT_RH_OFFSET_B -0.38f
+#define SHT_T_OFFSET_A   0.44f  // °C
+#define SHT_T_OFFSET_B   0.00f
 #define TFT_RST 47          // rev 6b: RES on D47; -1 only for a module whose RES has its own pull-up
 #define ROTATION 1          // 3 = landscape upside down
 const uint16_t W = 320, H = 170;

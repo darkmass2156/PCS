@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-04 | 0.9.2 + lite 1.8 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.2` |
 | 2026-11-04 | 0.9.1 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.1` |
 | 2026-11-04 | 0.9.0 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan header | rev11 | `fw-v0.9.0` |
 | 2026-11-04 | 0.8.4 + lite 1.7 | 8 | 1.9 | 2 | **6b**, V1 not fitted, tach direct + RC | rev11 | `fw-v0.8.4` |
@@ -67,6 +68,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.2 + lite 1.8 — 2026-11-04: all sensors calibrated to one another
+- `15_cal_all` run (10 min, still air, reference = median of the SHTs 23.10 °C / 33.39 %): NTC T1/T2/T3 −0.15 / +0.67 /
+  +0.54 °C; SHT A +0.44 °C / +0.50 %, B 0 / −0.38 %, R −0.32 °C / 0. Replaces the single-reading 2026-11-03 offsets.
+  Same values in lite170, 02, 10 and 12.
 ## BENCH — 2026-11-04: `15_cal_all`
 - New sketch: one 10 min run averages all three NTCs and all three SHTs side by side and prints every offset against
   the median of the SHTs (T and RH) as `config.h` lines.

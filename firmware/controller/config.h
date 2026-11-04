@@ -120,9 +120,9 @@
 #define NTC_R_PULLUP   10000.0f
 #define NTC_R25        10000.0f
 #define NTC_BETA       3435.0f   // ASSUMED until 01_ntc
-#define NTC_OFFSET_T1  0.0f
-#define NTC_OFFSET_T2  0.0f
-#define NTC_OFFSET_T3  0.0f
+#define NTC_OFFSET_T1 -0.15f   // 15_cal_all 2026-11-04: in air, vs the median of the SHTs (23.1 °C)
+#define NTC_OFFSET_T2  0.67f
+#define NTC_OFFSET_T3  0.54f
 #define NTC_ADC_SHORT  8        // ADC below this = probe shorted (~80 Ω), invalid at once
 #define NTC_ADC_OPEN   1015     // ADC above this = probe open / unplugged, invalid at once
 #define NTC_FLOAT_DELTA 40      // open-pin check: with the internal pull-up the pin reads > NTC_ADC_OPEN and rose more
@@ -155,14 +155,14 @@
 #define SHT_WIRE_TIMEOUT_US 25000UL   // rev 6b: Wire timeout; after one, the bus is recovered (9 SCL pulses)
 // RH calibration offsets, added to the reading (% RH), corrected RH clamped to 0..100.
 // A/B from a side-by-side run (2026-10-28): A read low, B high.
-// Calibration 2026-11-03: all three side by side, raw readings pulled to the median of the three
-// (A 21.45 °C 33.5 %, B 22.51 °C 34.8 %, R 22.64 °C 35.0 % -> median 22.51 °C 34.8 %).
-#define SHT_RH_OFFSET_A  1.3f    // SHT31 A 0x44, % RH
-#define SHT_RH_OFFSET_B  0.0f    // SHT31 B 0x45 (the median)
-#define SHT_RH_OFFSET_R -0.2f    // SHT30 room
-#define SHT_T_OFFSET_A   1.06f   // °C
-#define SHT_T_OFFSET_B   0.0f
-#define SHT_T_OFFSET_R  -0.13f
+// Calibration 2026-11-04 (15_cal_all): all six sensors side by side, 10 min raw average, each pulled to the median of
+// the three SHTs (23.10 °C, 33.39 %): A 22.66 °C 32.89 %, B 23.10 °C 33.77 %, R 23.42 °C 33.39 %.
+#define SHT_RH_OFFSET_A  0.50f   // SHT31 A 0x44, % RH
+#define SHT_RH_OFFSET_B -0.38f   // SHT31 B 0x45
+#define SHT_RH_OFFSET_R  0.00f   // SHT30 room (the RH median)
+#define SHT_T_OFFSET_A   0.44f   // °C
+#define SHT_T_OFFSET_B   0.00f   // (the T median)
+#define SHT_T_OFFSET_R  -0.32f
 
 // ---------------- Misc ----------------
 #define LONG_PRESS_MS   2000UL
