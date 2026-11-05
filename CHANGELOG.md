@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-05 | 0.9.4 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.4` |
 | 2026-11-04 | 0.9.3 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.3` |
 | 2026-11-04 | 0.9.2 + lite 1.8 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.2` |
 | 2026-11-04 | 0.9.1 + lite 1.7 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.1` |
@@ -71,6 +72,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.4 — 2026-11-05: fan minimum + kick-start
+- `05` sweep: 20 % from standstill = fan 1 stopped, fan 2 ~330 rpm; 30 % ramps to a steady ~1000 rpm, 70 % ~2040.
+  Tach readings clean (per-pulse range ±1–3 %). `FAN_PWM_MIN` 20 → 30.
+- Kick-start: fan at 0 rpm with a target below 60 % → 60 % for 3 s first, retried every 10 s.
 ## FW 0.9.3, DISP 10 — 2026-11-04
 - Serial SIM overrides `T1= T2= T3= TR= DP=` (control + faults use them, SIM shown, `clr` / 30 min clears), `m1..m3`
   sets the mode as the buttons do. For dry runs of every fault path without heating or cooling anything.

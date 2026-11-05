@@ -92,7 +92,10 @@
 #define P2_PWM_RUN       80
 #define P2_SPINUP_MS     3000UL
 #define PUMP_STALL_MS    5000UL
-#define FAN_PWM_MIN      20       // TBD: 05_fan_pwm_tach
+#define FAN_PWM_MIN      30       // 05 bench 2026-11-05: 20 % stalls / ~330 rpm, 30 % steady ~1000 rpm
+#define FAN_KICK_PCT     60       // kick-start duty when the fan reads 0 rpm below this
+#define FAN_KICK_MS      3000UL
+#define FAN_KICK_RETRY_MS 10000UL
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
 #define FAN1_TACH_FITTED 0       // 0: one fan header (FAN2, D19) + Y-splitter, only that tach is read (2026-11-04)

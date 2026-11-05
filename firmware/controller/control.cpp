@@ -34,9 +34,23 @@ static void p2AndV1Off() {
   hwSetPumpPct(0);
 }
 
+// Kick-start: an iPPC at low duty doesn't start from standstill (bench 2026-11-05: 20 % from stop gave 0 / 330 rpm,
+// 30 % ramps to ~1000). When the fan reads 0 rpm and the target is below FAN_KICK_PCT, run FAN_KICK_PCT for
+// FAN_KICK_MS, then the target; retried every FAN_KICK_RETRY_MS while it stays at 0.
+static uint32_t kickUntil, lastKickAt;
+static bool kickedOnce;
 static void setFans(uint8_t pct) {
   fanPct = pct;
-  hwSetFanPct(pct);
+  uint32_t now = millis();
+  bool stopped = rpmFan2 == 0;   // the read fan (FAN2 header); no pulses in the last second
+  if (pct > 0 && pct < FAN_KICK_PCT && stopped && (int32_t)(kickUntil - now) <= 0 &&
+      (!kickedOnce || now - lastKickAt >= FAN_KICK_RETRY_MS)) {
+    kickUntil = now + FAN_KICK_MS;
+    lastKickAt = now;
+    kickedOnce = true;
+  }
+  bool kicking = pct > 0 && (int32_t)(kickUntil - now) > 0;
+  hwSetFanPct(kicking && pct < FAN_KICK_PCT ? FAN_KICK_PCT : pct);
 }
 
 static bool flowing() {
