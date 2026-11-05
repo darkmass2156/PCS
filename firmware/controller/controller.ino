@@ -25,6 +25,8 @@ void captureResetFlags() {
 }
 
 static uint32_t lastLogAt;
+static bool csvMode;   // false: readable status line (default), true: CSV. EEPROM 8 (1 = CSV)
+static const uint8_t EE_LOGFMT = 8;
 
 static void printHeader() {
   Serial.print(F("# PCS controller fw " FW_VERSION " logic rev "));
@@ -42,8 +44,14 @@ static void printHeader() {
   if (SIM_FAKE_FAN_TACH) Serial.print(F(" fan tach faked;"));
   Serial.println();
 #endif
-  Serial.println(F("ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,"
-                   "rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms"));
+  if (csvMode) {
+    Serial.println(F("ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,V2mm,V2out%,fan%,pump%,"
+                     "rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms"));
+  } else {
+    Serial.println(F("# 1 Hz status (send csv for the machine-readable log). Temperatures in C."));
+    Serial.println(F("#  mode state | loop T1 / valve out T2 / outdoor rad T3 / T_out | dew point DP, setpoint Tset,"));
+    Serial.println(F("#  case + room | V2 angle, port opening mm, outdoor share % | fans % rpm | P2 % rpm | faults/alarms"));
+  }
 }
 
 static void printC(float v, bool ok) {
@@ -51,7 +59,64 @@ static void printC(float v, bool ok) {
   if (ok && !isnan(v)) Serial.print(v, 2);
 }
 
+// ---- readable 1 Hz status line ----
+static void pad(const char *s, uint8_t w) {
+  Serial.print(s);
+  for (uint8_t n = strlen(s); n < w; n++) Serial.print(' ');
+}
+static void num(float v, bool ok, uint8_t dec, uint8_t w) {   // right-aligned, "--" when invalid
+  char b[12];
+  if (ok && !isnan(v)) dtostrf(v, w, dec, b);
+  else { uint8_t i = 0; for (; i + 2 < w; i++) b[i] = ' '; b[i++] = '-'; b[i++] = '-'; b[i] = 0; }
+  Serial.print(b);
+}
+static void numU(long v, uint8_t w) {
+  char b[12];
+  ltoa(v, b, 10);
+  for (uint8_t n = strlen(b); n < w; n++) Serial.print(' ');
+  Serial.print(b);
+}
+static const char *const F_SHORT[] = {"T1", "T2", "T3", "NO-DP", "T2-LOW", "T1-LOW", "FUSE-P2", "FUSE-V", "P2-STALL"};
+static const char *const A_SHORT[] = {"FUSE-FAN", "FAN1-STALL", "FAN2-STALL", "SHT-A", "SHT-B", "SHT-R", "DP-SPREAD",
+                                      "M3-DEGRADED", "T1-LOW-IDLE", "FEAS-FORCED"};
+
+static void statusLine(uint32_t now) {
+  Serial.print('M'); Serial.print((uint8_t)st.mode); Serial.print(' ');
+  const char *sn = st.state == ST_IDLE ? (st.mode == MODE_OFF ? "OFF" : "SLEEP") : stateName(st.state);
+  pad(sn, 6);
+  Serial.print(F("| T1")); num(ntcT1.c, ntcT1.valid, 1, 6);
+  Serial.print(F("  T2")); num(ntcT2.c, ntcT2.valid, 1, 6);
+  Serial.print(F("  T3")); num(ntcT3.c, ntcT3.valid, 1, 6);
+  Serial.print(F("  Tout")); num(st.tOut, st.tOutOk, 1, 6);
+  Serial.print(F(" | DP")); num(st.dp, st.dpValid > 0, 1, 6);
+  Serial.print(F("  Tset")); num(st.tset, true, 1, 6);
+  float caseT = sht[SHT_A].valid ? sht[SHT_A].t : NAN, caseRH = sht[SHT_A].valid ? sht[SHT_A].rh : NAN;
+  if (sht[SHT_B].valid && (isnan(caseT) || sht[SHT_B].t > caseT)) caseT = sht[SHT_B].t;
+  if (sht[SHT_B].valid && (isnan(caseRH) || sht[SHT_B].rh > caseRH)) caseRH = sht[SHT_B].rh;
+  Serial.print(F("  case")); num(caseT, true, 1, 5); Serial.print('/'); num(caseRH, true, 0, 3); Serial.print('%');
+  Serial.print(F("  room")); num(sht[SHT_R].t, sht[SHT_R].valid, 1, 5); Serial.print('/');
+  num(sht[SHT_R].rh, sht[SHT_R].valid, 0, 3); Serial.print('%');
+  Serial.print(F(" | V2")); num(valveDeg(), valveHomed(), 1, 5); Serial.print(F(" deg"));
+  num(valveOpenMm(), valveHomed(), 1, 5); Serial.print(F(" mm"));
+  num(valveOutdoorPct(), valveHomed(), 0, 4); Serial.print(F("% out"));
+  if (valveBusy()) Serial.print(valveMoving() == V_OPEN ? F(" >") : valveMoving() == V_CLOSE ? F(" <") : F(" ."));
+  else Serial.print(F("  "));
+  Serial.print(F(" | fan")); numU(hwFanPct(), 4); Serial.print('%');
+  numU(rpmFan1, 5); Serial.print('/'); numU(rpmFan2, 4);
+  Serial.print(F(" | P2")); numU(hwPen() ? hwPumpPct() : 0, 4); Serial.print('%'); numU(rpmPump, 5);
+  if (V1_FITTED) { Serial.print(F(" | V1 ")); Serial.print(hwSen() ? F("open") : F("shut")); }
+  if (!hw12vPresent()) Serial.print(F(" | NO 12V"));
+  if (controlSimActive()) Serial.print(F(" | SIM"));
+  Serial.print(F(" |"));
+  if (!st.faults && !st.alarms) Serial.print(F(" ok"));
+  for (uint8_t i = 0; i < 9; i++) if (st.faults & (1 << i)) { Serial.print(F(" F:")); Serial.print(F_SHORT[i]); }
+  for (uint8_t i = 0; i < 10; i++) if (st.alarms & (1 << i)) { Serial.print(F(" A:")); Serial.print(A_SHORT[i]); }
+  Serial.println();
+  (void)now;
+}
+
 static void logLine(uint32_t now) {
+  if (!csvMode) { statusLine(now); return; }
   Serial.print(now);
   Serial.print(',');
   Serial.print((uint8_t)st.mode);
@@ -68,6 +133,8 @@ static void logLine(uint32_t now) {
   printC(st.dp, st.dpValid > 0);
   printC(st.tset, true);
   printC(valveDeg(), valveHomed());
+  printC(valveOpenMm(), valveHomed());
+  printC(valveOutdoorPct(), valveHomed());
   Serial.print(',');
   Serial.print(hwFanPct());
   Serial.print(',');
@@ -184,6 +251,7 @@ static void printStatus() {
 // ---------------- serial commands ----------------
 static void testHelp() {
   Serial.println(F("# commands: ? status | h help | m1 m2 m3 mode (as the buttons) | rc clear reset counters"));
+  Serial.println(F("#   csv / txt: 1 Hz log as CSV or as the readable status line (remembered)"));
   Serial.println(F("#   SIM: T1=.. T2=.. T3=.. TR=.. DP=.. force a value (T2= clears it), clr clears all, 30 min max."));
   Serial.println(F("#        The control logic and all faults use the forced value; display and banner show SIM."));
   Serial.println(F("#   t test mode on (Mode 1, idle) | x test mode off"));
@@ -196,7 +264,9 @@ static void testState() {
   Serial.print(F("# TEST fans ")); Serial.print(hwFanPct());
   Serial.print(F("% P2 ")); Serial.print(hwPen() ? F("on ") : F("off ")); Serial.print(hwPumpPct());
   Serial.print(F("% V1 ")); Serial.print(!V1_FITTED ? F("not fitted") : hwSen() ? F("open") : F("closed"));
-  Serial.print(F(" V2 ")); Serial.print(valveDeg(), 1); Serial.println(valveHomed() ? F(" deg") : F(" deg (not homed)"));
+  Serial.print(F(" V2 ")); Serial.print(valveDeg(), 1); Serial.print(F(" deg "));
+  Serial.print(valveOpenMm(), 1); Serial.print(F(" mm ")); Serial.print(valveOutdoorPct(), 0);
+  Serial.println(valveHomed() ? F("% outdoor") : F("% outdoor (not homed)"));
 }
 
 // ---- SIM overrides and reset counters ----
@@ -272,6 +342,12 @@ static bool simCommand(char *s) {
 static void runCommand(char *s) {
   if (simCommand(s)) return;
   if (!strcmp(s, "clr")) { simClear(F("clr")); return; }
+  if (!strcmp(s, "csv") || !strcmp(s, "txt")) {   // log format, kept in EEPROM 8
+    csvMode = s[0] == 'c';
+    EEPROM.update(EE_LOGFMT, csvMode ? 1 : 0);
+    printHeader();
+    return;
+  }
   if (!strcmp(s, "rc")) {
     for (uint8_t i = 0; i < 4; i++) EEPROM.update(EE_RST + i, 0);
     printResets();
@@ -342,6 +418,7 @@ void setup() {
   hwInit();
 
   Serial.begin(115200);
+  csvMode = EEPROM.read(EE_LOGFMT) == 1;
   printHeader();
   Serial.print(F("# reset flags 0x"));
   Serial.println(resetFlags, HEX);

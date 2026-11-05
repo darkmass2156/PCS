@@ -396,9 +396,15 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
     boot / no valid DP = purple; 12V absent shows the mode colour. Pick one after `13_led_pins`.
   - Liveness: the LED is computed from `millis()` in `loop()` only (no timer/ISR). A hung loop freezes the
     LED at its current brightness; the 2 s watchdog then resets (LED off) and breathing resumes after boot.
-- Serial CSV at 1 Hz. `#` lines are comments (version banner, header). Columns:
-  `ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,fan%,pump%,rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms`
-  (fuses/faults/alarms as hex bitmasks, see `control.h`).
+- Serial log at 1 Hz (FW 0.9.6), two formats, `txt` / `csv` switches (kept in EEPROM 8):
+  - **txt** (default): one labelled, column-aligned status line: mode + state | T1 T2 T3 Tout | DP Tset case room |
+    V2 deg, port opening mm, outdoor share % and `>`/`<` while moving | fan % rpm1/rpm2 | P2 % rpm | NO 12V, SIM |
+    `ok` or the active faults/alarms by short name (`F:T2-LOW`, `A:SHT-R`, …).
+  - **csv**: `ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,V2mm,V2out%,fan%,pump%,rpmF1,rpmF2,rpmP2,
+    V1,fuses,faults,alarms` (fuses/faults/alarms as hex bitmasks, see `control.h`).
+  - V2 mm = motion past the edge × `V2_MM_PER_MS` (1.35 mm / 500 ms); outdoor % = 0 at the edge, 50 at `V2_HALF_MS`,
+    100 all ports open (piecewise linear, from the bench calibration).
+  `#` lines are comments (version banner, legend/header, events).
 - Serial events (`#` lines): state / mode changes from boot; at the end of the boot grace (10 s) every active
   fault and alarm by name, then each one as it turns ON / off — to match the LED to a cause.
 - Serial input (line based: CR/LF or 50 ms of silence ends a command):

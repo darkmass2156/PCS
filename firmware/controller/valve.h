@@ -18,4 +18,6 @@ bool valveHomed();
 bool valveParked();                      // homed, θ = 0 and idle
 bool valveShut();                        // homed, at or below the edge and idle: no outdoor flow
 float valveDeg();
+float valveOpenMm();                     // outdoor port opening past the edge, mm (bench: ~1.35 mm per 500 ms)
+float valveOutdoorPct();                 // outdoor share: 0 at the edge, 50 at V2_HALF_MS, 100 all ports open
 ValveDir valveMoving();

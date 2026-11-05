@@ -73,6 +73,7 @@
 #define V2_BACKLASH_MS         725UL    // play after a reversal before the ball moves
 #define V2_DEAD_MS             1300UL   // motion from bypass before the outdoor port starts to open
 #define V2_HALF_MS             3100UL   // motion from bypass to 50 % outdoor (both inlets half)
+#define V2_MM_PER_MS           (1.35f / 500.0f)   // port opening rate (bench: ~1.35 mm per 500 ms)
 #define V2_PARK_MS             10000UL  // park: VC this long (end-to-end 6400 ms + margin, autostop ends it)
 #define V2_MIN_PULSE_MS        150UL
 #define V2_REVERSE_DEADTIME_MS 500UL

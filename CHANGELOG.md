@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-05 | 0.9.6 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.6` |
 | 2026-11-05 | 0.9.5 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.5` |
 | 2026-11-05 | 0.9.4 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.4` |
 | 2026-11-04 | 0.9.3 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.3` |
@@ -75,6 +76,11 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.6 — 2026-11-05: readable serial log
+- Default 1 Hz output is now a labelled, aligned status line (`txt`); `csv` switches back to CSV (EEPROM 8).
+  Faults/alarms by short name instead of hex. V2 port opening (mm) and outdoor share (%) added to both formats
+  and to the test-mode echo; CSV gains `V2mm,V2out%` after `V2deg`.
 ## FW 0.9.5 — 2026-11-05: fan 1 tach back, with a low-duty fallback
 - Fans on separate headers again (`FAN1_TACH_FITTED 1`). Bench sweep: fan 1's tach is swamped by the PWM below 30 %
   (raw ~380k, no valid pulses at 20 %), clean from 30 %. Below `FAN1_TACH_MIN_PCT` fan 1 reports fan 2's rpm.

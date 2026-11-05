@@ -146,3 +146,17 @@ bool valveJog(ValveDir dir, uint32_t ms) {
   request(dir, ms, false);
   return true;
 }
+
+// Position helpers for the log (from the bench calibration, docs/changes/v2_calibration.md).
+float valveOpenMm() {
+  float ms = (deg - V2_FLOW_DEG) / 90.0f * V2_T_OPEN_MS;   // motion past the edge
+  return ms > 0 ? ms * V2_MM_PER_MS : 0.0f;
+}
+
+float valveOutdoorPct() {
+  float ms = deg / 90.0f * V2_T_OPEN_MS;                   // motion from bypass
+  if (ms <= V2_DEAD_MS) return 0.0f;
+  if (ms <= V2_HALF_MS) return 50.0f * (ms - V2_DEAD_MS) / (V2_HALF_MS - V2_DEAD_MS);
+  float p = 50.0f + 50.0f * (ms - V2_HALF_MS) / (V2_T_OPEN_MS - V2_HALF_MS);
+  return p > 100.0f ? 100.0f : p;
+}
