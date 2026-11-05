@@ -256,7 +256,8 @@ static void testHelp() {
   Serial.println(F("#        The control logic and all faults use the forced value; display and banner show SIM."));
   Serial.println(F("#   t test mode on (Mode 1, idle) | x test mode off"));
   Serial.println(F("#   in test mode: f<0-100> fans % | p<0-100> P2 % (p0 = PEN off) | v1 / v0 V1 open / closed"));
-  Serial.println(F("#                 o<ms> / c<ms> V2 open / close run (max 15000) | k park V2 | s stop V2"));
+  Serial.println(F("#                 V2: dg<deg> angle (dg45) | o<mm> opening (o5) | o<pct>% outdoor (o50%)"));
+  Serial.println(F("#                 +<ms> / -<ms> raw open / close run (max 15000) | k park (homes) | s stop"));
   Serial.println(F("#   faults stay armed; test mode ends on x, a button, a fault, 12V loss or 30 min idle"));
 }
 
@@ -376,7 +377,7 @@ static void runCommand(char *s) {
     if (controlTesting()) { controlTestExit(); Serial.println(F("# TEST mode OFF, V2 parking")); }
     return;
   }
-  if (!strchr("fpvocks", c)) { Serial.println(F("# ? unknown command, h for help")); return; }
+  if (!strchr("fpvodks+-", c)) { Serial.println(F("# ? unknown command, h for help")); return; }
   if (!controlTesting()) { Serial.println(F("# not in test mode: send t first (Mode 1)")); return; }
   bool ok = true;
   switch (c) {
@@ -386,8 +387,22 @@ static void runCommand(char *s) {
       if (!V1_FITTED) Serial.println(F("# V1 not fitted (V1_FITTED 0)"));
       controlTestV1(n == 1);
       break;
-    case 'o': ok = valveJog(V_OPEN, constrain(n, 1, 15000)); break;
-    case 'c': ok = valveJog(V_CLOSE, constrain(n, 1, 15000)); break;
+    case 'o': {                          // o<mm> or o<pct>% : go to that outdoor opening
+      float v = atof(s + 1);
+      bool pctIn = strchr(s, '%') != nullptr;
+      if (!valveHomed()) { Serial.println(F("# V2 not homed: send k (park) first")); ok = true; break; }
+      float target = pctIn ? valveDegForPct(v) : valveDegForMm(v);
+      Serial.print(F("# V2 -> ")); Serial.print(target, 1); Serial.println(F(" deg"));
+      ok = valveGoto(target);
+      break;
+    }
+    case 'd':                            // dg<deg> : go to that angle (0 = bypass end, 90 = all ports open)
+      if (s[1] != 'g') { Serial.println(F("# ? use dg<deg>, e.g. dg45")); return; }
+      if (!valveHomed()) { Serial.println(F("# V2 not homed: send k (park) first")); ok = true; break; }
+      ok = valveGoto(atof(s + 2));
+      break;
+    case '+': ok = valveJog(V_OPEN, constrain(n, 1, 15000)); break;    // raw timed run, ms
+    case '-': ok = valveJog(V_CLOSE, constrain(n, 1, 15000)); break;
     case 'k': valvePark(); break;
     case 's': valveStop(); break;
   }

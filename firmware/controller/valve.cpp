@@ -160,3 +160,31 @@ float valveOutdoorPct() {
   float p = 50.0f + 50.0f * (ms - V2_HALF_MS) / (V2_T_OPEN_MS - V2_HALF_MS);
   return p > 100.0f ? 100.0f : p;
 }
+
+static float degForMs(float ms) { return ms / V2_T_OPEN_MS * 90.0f; }   // motion from bypass -> θ
+
+float valveDegForMm(float mm) {
+  if (mm < 0) mm = 0;
+  return degForMs(V2_DEAD_MS + mm / V2_MM_PER_MS);
+}
+
+float valveDegForPct(float pct) {
+  if (pct <= 0) return V2_FLOW_DEG;
+  if (pct <= 50) return degForMs(V2_DEAD_MS + pct / 50.0f * (V2_HALF_MS - V2_DEAD_MS));
+  if (pct > 100) pct = 100;
+  return degForMs(V2_HALF_MS + (pct - 50) / 50.0f * (V2_T_OPEN_MS - V2_HALF_MS));
+}
+
+bool valveGoto(float target) {
+  if (!powerOk || !homed || valveBusy()) return false;
+  if (target < 0) target = 0;
+  if (target > 90) target = 90;
+  float diff = target - deg;
+  if (diff > -0.3f && diff < 0.3f) return true;                 // already there
+  ValveDir d = diff > 0 ? V_OPEN : V_CLOSE;
+  float full = d == V_OPEN ? (float)V2_T_OPEN_MS : (float)V2_T_CLOSE_MS;
+  uint32_t ms = (uint32_t)((diff > 0 ? diff : -diff) / 90.0f * full);
+  if (lastDir != V_NONE && d != lastDir) ms += V2_BACKLASH_MS;   // begin() spends the play first
+  request(d, ms, false);
+  return true;
+}

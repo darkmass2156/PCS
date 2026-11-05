@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-05 | 0.9.7 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.7` |
 | 2026-11-05 | 0.9.6 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.6` |
 | 2026-11-05 | 0.9.5 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.5` |
 | 2026-11-05 | 0.9.4 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.4` |
@@ -77,6 +78,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.7 — 2026-11-05: V2 positioning in test mode
+- `dg<deg>`, `o<mm>`, `o<pct>%` move V2 to an absolute angle / port opening / outdoor share (from the estimate, play
+  added on a reversal). The old `o<ms>` / `c<ms>` raw runs are now `+<ms>` / `-<ms>`.
 ## FW 0.9.6 — 2026-11-05: readable serial log
 - Default 1 Hz output is now a labelled, aligned status line (`txt`); `csv` switches back to CSV (EEPROM 8).
   Faults/alarms by short name instead of hex. V2 port opening (mm) and outdoor share (%) added to both formats

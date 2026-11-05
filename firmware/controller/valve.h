@@ -20,4 +20,7 @@ bool valveShut();                        // homed, at or below the edge and idle
 float valveDeg();
 float valveOpenMm();                     // outdoor port opening past the edge, mm (bench: ~1.35 mm per 500 ms)
 float valveOutdoorPct();                 // outdoor share: 0 at the edge, 50 at V2_HALF_MS, 100 all ports open
+float valveDegForMm(float mm);           // inverse of valveOpenMm (0 mm = the edge)
+float valveDegForPct(float pct);         // inverse of valveOutdoorPct (0 % = the edge)
+bool valveGoto(float targetDeg);         // test mode: timed run from the estimate to targetDeg (homed, idle only)
 ValveDir valveMoving();

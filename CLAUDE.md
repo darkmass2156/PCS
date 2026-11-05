@@ -418,8 +418,10 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
   - **Reset counters**: EEPROM 4..7 count watchdog / brown-out / external / power-on resets (saturating); printed at
     boot and in `?`, `rc` clears them. To tell a watchdog hang from a 5V dip from a DTR reset.
   - **Serial test mode** (FW 0.7.0, state `TEST`): `t` enters it, only from Mode 1 at idle with 12V and no fault.
-    `f<0-100>` fans %, `p<0-100>` P2 % (`p0` = PEN off), `v1`/`v0` V1, `o<ms>`/`c<ms>` V2 timed run (max 15 s, no
-    edge logic), `k` park, `s` stop V2. Every command echoes a `# TEST …` line. All faults stay armed (T2/T1 low with
+    `f<0-100>` fans %, `p<0-100>` P2 % (`p0` = PEN off), `v1`/`v0` V1. V2 (FW 0.9.7, needs homed: `k` parks/homes):
+    `dg<deg>` go to an angle (0 bypass … 90 all ports open), `o<mm>` go to a port opening in mm (`o0` = the edge,
+    ~10 mm = all open), `o<pct>%` go to an outdoor share (`o50%`); the run time comes from the position estimate
+    incl. the play on a reversal. `+<ms>` / `-<ms>` raw open / close run (max 15 s), `s` stop V2. Every command echoes a `# TEST …` line. All faults stay armed (T2/T1 low with
     P2 on, P2 stall, fuses, NTCs) and a fault goes to SAFE as usual. Leaves on `x`, any button, a fault, 12V loss or
     `TEST_TIMEOUT_MS` (30 min) without a command; on leaving P2 and V1 go off, fans to minimum, V2 parks.
 - Known: opening the COM port toggles DTR and resets the Mega (CH340 auto-reset) → safe boot, V2 re-park.
