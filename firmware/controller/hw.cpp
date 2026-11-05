@@ -115,8 +115,10 @@ void hwUpdateTach(uint32_t now) {
   interrupts();
   lastRpmAt = now;
   // 2 pulses per revolution
-  rpmFan1 = FAN1_TACH_FITTED ? (uint16_t)((f1 * 30000UL) / dt) : 0;
   rpmFan2 = (uint16_t)((f2 * 30000UL) / dt);
+  // Fan 1's tach picks up the PWM below ~30 % duty (bench 2026-11-05: raw ~380k, no valid pulses at 20 %, clean from
+  // 30 %). Below FAN1_TACH_MIN_PCT it reports fan 2's rpm (both share one PWM line, so they run alike) - Vlad's call.
+  rpmFan1 = !FAN1_TACH_FITTED ? 0 : fanPct < FAN1_TACH_MIN_PCT ? rpmFan2 : (uint16_t)((f1 * 30000UL) / dt);
   rpmPump = (uint16_t)((p * 30000UL) / dt);
 #if SIM_FAKE_P2_TACH
   if (hwPen()) rpmPump = 3000;

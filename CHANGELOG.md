@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-05 | 0.9.5 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.5` |
 | 2026-11-05 | 0.9.4 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.4` |
 | 2026-11-04 | 0.9.3 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.3` |
 | 2026-11-04 | 0.9.2 + lite 1.8 | 9 | 1.9 | 2 | **6b**, V1 not fitted, one fan tach | rev11 | `fw-v0.9.2` |
@@ -73,6 +74,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.5 — 2026-11-05: fan 1 tach back, with a low-duty fallback
+- Fans on separate headers again (`FAN1_TACH_FITTED 1`). Bench sweep: fan 1's tach is swamped by the PWM below 30 %
+  (raw ~380k, no valid pulses at 20 %), clean from 30 %. Below `FAN1_TACH_MIN_PCT` fan 1 reports fan 2's rpm.
+  (`FAN_PWM_MIN` is 30, so this only matters during test-mode duties below 30.)
+- `05_fan_pwm_tach`: serial input is line based (f10, F10, "f 10" all work).
 ## FW 0.9.4 — 2026-11-05: fan minimum + kick-start
 - `05` sweep: 20 % from standstill = fan 1 stopped, fan 2 ~330 rpm; 30 % ramps to a steady ~1000 rpm, 70 % ~2040.
   Tach readings clean (per-pulse range ±1–3 %). `FAN_PWM_MIN` 20 → 30.

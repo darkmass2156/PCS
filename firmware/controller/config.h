@@ -98,7 +98,8 @@
 #define FAN_KICK_RETRY_MS 10000UL
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
-#define FAN1_TACH_FITTED 0       // 0: one fan header (FAN2, D19) + Y-splitter, only that tach is read (2026-11-04)
+#define FAN1_TACH_FITTED 1       // 1: fan 1 on FAN1 (D18), fan 2 on FAN2 (D19), both tachs read (bench 2026-11-05)
+#define FAN1_TACH_MIN_PCT 30     // below this duty fan 1's tach is unreliable (PWM coupling): it reports fan 2's rpm
 #define TACH_DEBOUNCE    3        // tach: samples (~250 us each, Timer4) a new level must hold before it counts
 #define FAN_STALL_MS     5000UL
 

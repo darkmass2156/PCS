@@ -51,6 +51,42 @@ void timer4Init() {   // CTC, /64, OCR 62 -> 3968 Hz (252 us)
 uint8_t duty;
 bool sweep;
 uint32_t stepAt;
+void setDuty(uint8_t pct);
+
+// Line based, as the firmware: a command ends with CR/LF or 50 ms of silence, so it works with any serial-monitor
+// line ending. f<0-100> fixed duty (also "f 10", "F10"), s sweep, ? help.
+void runCommand(char *s) {
+  char c = s[0] | 0x20;   // lower case
+  if (c == 'f') {
+    char *p = s + 1;
+    while (*p == ' ') p++;
+    if (*p < '0' || *p > '9') { Serial.println(F("f needs a number, e.g. f30")); return; }
+    sweep = false;
+    setDuty(constrain(atoi(p), 0, 100));
+  } else if (c == 's') {
+    sweep = true;
+    stepAt = millis();
+    setDuty(0);
+  } else {
+    Serial.println(F("commands: f<0-100> duty, s sweep"));
+  }
+}
+
+void serialInput() {
+  static char buf[16];
+  static uint8_t len;
+  static uint32_t lastAt;
+  while (Serial.available()) {
+    char ch = Serial.read();
+    lastAt = millis();
+    if (ch == '\r' || ch == '\n') {
+      if (len) { buf[len] = 0; runCommand(buf); len = 0; }
+    } else if (len < sizeof(buf) - 1) {
+      buf[len++] = ch;
+    }
+  }
+  if (len && millis() - lastAt >= 50) { buf[len] = 0; runCommand(buf); len = 0; }
+}
 
 // ---------------- display ----------------
 void initPanel() {
@@ -143,11 +179,7 @@ void loop() {
   }
   if (btn1.longPress) { sweep = true; stepAt = millis(); setDuty(0); }
   if (btn2.longPress) { sweep = false; setDuty(0); }
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == 'f') { sweep = false; setDuty(constrain(Serial.parseInt(), 0, 100)); }
-    if (c == 's') { sweep = true; stepAt = millis(); setDuty(0); }
-  }
+  serialInput();
   if (sweep && millis() - stepAt >= 8000) {
     stepAt = millis();
     if (duty >= 100) { sweep = false; setDuty(0); Serial.println(F("sweep done")); }
