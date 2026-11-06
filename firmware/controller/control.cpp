@@ -20,6 +20,7 @@ static uint8_t testFan, testPump;
 static bool testV1;
 static uint32_t testAt;
 static float dpOverride = NAN;
+static float toutOverride = NAN;   // serial SIM: T_out held at this value
 
 // ---------------- helpers ----------------
 static void enter(BranchState s, uint32_t now) {
@@ -137,6 +138,11 @@ static void updateDerived(uint32_t now) {
       st.tOutOk = true;
       a &= ~A_FEAS_FORCED;
     }
+  }
+
+  if (!isnan(toutOverride)) {        // serial SIM override
+    st.tOut = toutOverride;
+    st.tOutOk = true;
   }
 
   if (!hwPen() && st.dpValid && ntcT1.valid && ntcT1.c < st.dp + T1_TRIP_DP_C) a |= A_T1_LOW_IDLE;
@@ -455,4 +461,6 @@ void controlTestV1(bool open) { testV1 = open; testAt = millis(); }
 
 void controlSetDpOverride(float dp) { dpOverride = dp; }
 float controlDpOverride() { return dpOverride; }
-bool controlSimActive() { return sensorsOverrideActive() || !isnan(dpOverride); }
+void controlSetToutOverride(float t) { toutOverride = t; }
+float controlToutOverride() { return toutOverride; }
+bool controlSimActive() { return sensorsOverrideActive() || !isnan(dpOverride) || !isnan(toutOverride); }

@@ -49,7 +49,7 @@ static void printHeader() {
                      "rpmF1,rpmF2,rpmP2,V1,fuses,faults,alarms"));
   } else {
     Serial.println(F("# 1 Hz status (send csv for the machine-readable log). Temperatures in C."));
-    Serial.println(F("#  mode state | loop T1 / valve out T2 / outdoor rad T3 / T_out | dew point DP, setpoint Tset,"));
+    Serial.println(F("#  mode state | Ret = loop return T1 / Mix = V2 outlet T2 / Rad = outdoor rad T3 / Tout | dew point DP, setpoint Tset,"));
     Serial.println(F("#  case + room | V2 angle, port opening mm, outdoor share % | fans % rpm | P2 % rpm | faults/alarms"));
   }
 }
@@ -76,17 +76,17 @@ static void numU(long v, uint8_t w) {
   for (uint8_t n = strlen(b); n < w; n++) Serial.print(' ');
   Serial.print(b);
 }
-static const char *const F_SHORT[] = {"T1", "T2", "T3", "NO-DP", "T2-LOW", "T1-LOW", "FUSE-P2", "FUSE-V", "P2-STALL"};
+static const char *const F_SHORT[] = {"NTC-RET", "NTC-MIX", "NTC-RAD", "NO-DP", "MIX-LOW", "RET-LOW", "FUSE-P2", "FUSE-V", "P2-STALL"};
 static const char *const A_SHORT[] = {"FUSE-FAN", "FAN1-STALL", "FAN2-STALL", "SHT-A", "SHT-B", "SHT-R", "DP-SPREAD",
-                                      "M3-DEGRADED", "T1-LOW-IDLE", "FEAS-FORCED"};
+                                      "M3-DEGRADED", "RET-LOW-IDLE", "FEAS-FORCED"};
 
 static void statusLine(uint32_t now) {
   Serial.print('M'); Serial.print((uint8_t)st.mode); Serial.print(' ');
   const char *sn = st.state == ST_IDLE ? (st.mode == MODE_OFF ? "OFF" : "SLEEP") : stateName(st.state);
   pad(sn, 6);
-  Serial.print(F("| T1")); num(ntcT1.c, ntcT1.valid, 1, 6);
-  Serial.print(F("  T2")); num(ntcT2.c, ntcT2.valid, 1, 6);
-  Serial.print(F("  T3")); num(ntcT3.c, ntcT3.valid, 1, 6);
+  Serial.print(F("| Ret")); num(ntcT1.c, ntcT1.valid, 1, 6);
+  Serial.print(F("  Mix")); num(ntcT2.c, ntcT2.valid, 1, 6);
+  Serial.print(F("  Rad")); num(ntcT3.c, ntcT3.valid, 1, 6);
   Serial.print(F("  Tout")); num(st.tOut, st.tOutOk, 1, 6);
   Serial.print(F(" | DP")); num(st.dp, st.dpValid > 0, 1, 6);
   Serial.print(F("  Tset")); num(st.tset, true, 1, 6);
@@ -158,12 +158,12 @@ static void logLine(uint32_t now) {
 
 // Fault / alarm / state reasons on Serial ('#' lines, the CSV stays parseable): everything active at boot, then
 // every change, so the LED colour can be matched to a cause.
-static const char FN0[] PROGMEM = "NTC T1 (open/short/out of range)";
-static const char FN1[] PROGMEM = "NTC T2 (open/short/out of range)";
-static const char FN2[] PROGMEM = "NTC T3 (open/short/out of range)";
+static const char FN0[] PROGMEM = "NTC Ret T1 loop return (open/short/out of range)";
+static const char FN1[] PROGMEM = "NTC Mix T2 V2 outlet (open/short/out of range)";
+static const char FN2[] PROGMEM = "NTC Rad T3 outdoor rad (open/short/out of range)";
 static const char FN3[] PROGMEM = "no valid dew point (no SHT)";
-static const char FN4[] PROGMEM = "T2 < DP + 1 with P2 running";
-static const char FN5[] PROGMEM = "T1 < DP + 2 with P2 running";
+static const char FN4[] PROGMEM = "Mix T2 < DP + 1 with P2 running";
+static const char FN5[] PROGMEM = "Ret T1 < DP + 2 with P2 running";
 static const char FN6[] PROGMEM = "fuse S1 (P2)";
 static const char FN7[] PROGMEM = "fuse S3 (V1 + V2)";
 static const char FN8[] PROGMEM = "P2 stall (no tach)";
@@ -176,7 +176,7 @@ static const char AN4[] PROGMEM = "SHT31 B 0x45 invalid";
 static const char AN5[] PROGMEM = "SHT30 room invalid";
 static const char AN6[] PROGMEM = "DP spread > 2 C";
 static const char AN7[] PROGMEM = "Mode 3 with < 2 DP sources (Mode 2 setpoint)";
-static const char AN8[] PROGMEM = "T1 < DP + 2 with P2 off";
+static const char AN8[] PROGMEM = "Ret T1 < DP + 2 with P2 off";
 static const char AN9[] PROGMEM = "feasibility: forced to bypass";
 static const char *const ALARM_TXT[] = {AN0, AN1, AN2, AN3, AN4, AN5, AN6, AN7, AN8, AN9};
 
@@ -238,7 +238,7 @@ static void printStatus() {
   Serial.print(F(" I2C recoveries ")); Serial.println(i2cRecoveries);
   // NTC inputs as the ADC sees them: counts, resistance (10k pull-up), temperature
   const NtcReading *n[3] = {&ntcT1, &ntcT2, &ntcT3};
-  const char *const NAME[3] = {"T1 A5", "T2 A4", "T3 A3"};
+  const char *const NAME[3] = {"Ret T1 A5", "Mix T2 A4", "Rad T3 A3"};
   for (uint8_t i = 0; i < 3; i++) {
     Serial.print(F("# NTC ")); Serial.print(NAME[i]);
     Serial.print(F(": adc ")); Serial.print(n[i]->adc, 1);
@@ -253,7 +253,8 @@ static void printStatus() {
 static void testHelp() {
   Serial.println(F("# commands: ? status | h help | m1 m2 m3 mode (as the buttons) | rc clear reset counters"));
   Serial.println(F("#   csv / txt: 1 Hz log as CSV or as the readable status line (remembered)"));
-  Serial.println(F("#   SIM: T1=.. T2=.. T3=.. TR=.. DP=.. force a value (T2= clears it), clr clears all, 30 min max."));
+  Serial.println(F("#   SIM: Ret Mix Rad Tout TR DP (or T1 T2 T3) + value: Rad=-15 or Rad -15. Rad= clears it,"));
+  Serial.println(F("#        clr clears all, 30 min max. Tout is held at the value (feasibility uses it)."));
   Serial.println(F("#        The control logic and all faults use the forced value; display and banner show SIM."));
   Serial.println(F("#   t test mode on (Mode 1, idle) | x test mode off"));
   Serial.println(F("#   in test mode: f<0-100> fans % | p<0-100> P2 % (p0 = PEN off) | v1 / v0 V1 open / closed"));
@@ -298,14 +299,23 @@ static void printResets() {
   Serial.print(F(" | up ")); Serial.print(millis() / 1000); Serial.println(F(" s"));
 }
 
-static const char *const SIM_NAME[5] = {"T1", "T2", "T3", "TR", "DP"};
-static float simGet(uint8_t i) { return i < 4 ? sensorsOverride(i) : controlDpOverride(); }
-static void simSet(uint8_t i, float v) { if (i < 4) sensorsSetOverride(i, v); else controlSetDpOverride(v); }
+// 0..2 NTCs, 3 room T, 4 DP, 5 T_out. Printed by the first name; aliases below.
+#define SIM_N 6
+static const char *const SIM_NAME[SIM_N] = {"Ret", "Mix", "Rad", "TR", "DP", "Tout"};
+struct SimAlias { const char *name; uint8_t idx; };
+static const SimAlias SIM_ALIAS[] = {{"Tout", 5}, {"Ret", 0}, {"Mix", 1}, {"Rad", 2}, {"T1", 0}, {"T2", 1}, {"T3", 2},
+                                     {"TR", 3}, {"DP", 4}};   // longest-prefix first where they overlap (Tout/TR/T1)
+static float simGet(uint8_t i) { return i < 4 ? sensorsOverride(i) : i == 4 ? controlDpOverride() : controlToutOverride(); }
+static void simSet(uint8_t i, float v) {
+  if (i < 4) sensorsSetOverride(i, v);
+  else if (i == 4) controlSetDpOverride(v);
+  else controlSetToutOverride(v);
+}
 
 static void printSim() {
   if (!controlSimActive()) { Serial.println(F("# SIM: no overrides (live sensors)")); return; }
   Serial.print(F("# SIM overrides:"));
-  for (uint8_t i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < SIM_N; i++) {
     float v = simGet(i);
     if (isnan(v)) continue;
     Serial.print(' '); Serial.print(SIM_NAME[i]); Serial.print('='); Serial.print(v, 2);
@@ -315,19 +325,28 @@ static void printSim() {
 }
 
 static void simClear(const __FlashStringHelper *why) {
-  for (uint8_t i = 0; i < 5; i++) simSet(i, NAN);
+  for (uint8_t i = 0; i < SIM_N; i++) simSet(i, NAN);
   Serial.print(F("# SIM overrides cleared (")); Serial.print(why); Serial.println(')');
 }
 
-// "T2=12.5", "dp=8", "T2=" or "T2=-" clears that one. Names case-insensitive: T1 T2 T3 TR DP.
+// "Rad=-15", "Rad -15", "rad-15", "T2=12.5", "dp=8"; "Mix=" or "Mix=-" clears one. Names case-insensitive.
+// Spaces are stripped before this, so a name followed directly by a number is a SIM command too. Must run before the
+// one-letter commands: "tout-15" used to start test mode ('t').
 static bool simCommand(char *s) {
-  char *eq = strchr(s, '=');
-  if (!eq) return false;
-  *eq = 0;
   int8_t idx = -1;
-  for (uint8_t i = 0; i < 5; i++) if (!strcasecmp(s, SIM_NAME[i])) idx = i;
-  if (idx < 0) { Serial.println(F("# SIM: names are T1 T2 T3 TR DP, e.g. T2=12.5")); return true; }
-  const char *v = eq + 1;
+  const char *v = nullptr;
+  for (uint8_t k = 0; k < sizeof(SIM_ALIAS) / sizeof(SIM_ALIAS[0]) && idx < 0; k++) {
+    uint8_t l = strlen(SIM_ALIAS[k].name);
+    if (strncasecmp(s, SIM_ALIAS[k].name, l)) continue;
+    const char *r = s + l;
+    if (*r == '=') { idx = SIM_ALIAS[k].idx; v = r + 1; }
+    else if (*r == '-' || *r == '+' || *r == '.' || (*r >= '0' && *r <= '9')) { idx = SIM_ALIAS[k].idx; v = r; }
+  }
+  if (idx < 0) {
+    if (!strchr(s, '=')) return false;
+    Serial.println(F("# SIM: names are Ret Mix Rad Tout TR DP (or T1 T2 T3), e.g. Rad=-15"));
+    return true;
+  }
   if (!*v || (*v == '-' && !v[1])) {
     simSet(idx, NAN);
   } else {
@@ -357,24 +376,24 @@ static void runCommand(char *s) {
   }
   char c = s[0];
   long n = atol(s + 1);
-  if (c == '?') {
+  if (c == '?' && !s[1]) {
     printStatus();
     sensorsRoomDiag();
     reportEvents(true);
     return;
   }
-  if (c == 'h') { testHelp(); return; }
+  if (c == 'h' && !s[1]) { testHelp(); return; }
   if (c == 'm' && n >= 1 && n <= 3) {    // same as the buttons: also acknowledges faults whose cause is gone
     controlButton((Mode)n);
     Serial.print(F("# MODE ")); Serial.print(n); Serial.println(F(" (serial)"));
     return;
   }
-  if (c == 't') {
+  if (c == 't' && !s[1]) {
     if (controlTestEnter()) { Serial.println(F("# TEST mode ON")); testState(); }
     else Serial.println(F("# TEST refused: needs Mode 1 (BTN1), idle, 12V present and no fault"));
     return;
   }
-  if (c == 'x') {
+  if (c == 'x' && !s[1]) {
     if (controlTesting()) { controlTestExit(); Serial.println(F("# TEST mode OFF, V2 parking")); }
     return;
   }

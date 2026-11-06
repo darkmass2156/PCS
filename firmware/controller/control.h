@@ -72,5 +72,7 @@ void controlTestV1(bool open);
 
 // Serial SIM: DP override (NAN clears); controlSimActive() = any sensor or DP override set (shown as SIM).
 void controlSetDpOverride(float dp);
+void controlSetToutOverride(float t);
+float controlToutOverride();
 float controlDpOverride();
 bool controlSimActive();

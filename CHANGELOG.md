@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-06 | 0.9.7d + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7c + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7b + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7a + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild | rev11 | — |
@@ -82,6 +83,13 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.7d — 2026-11-06 (HW 6b)
+- Bug: anything starting with `t` (`tout-15`, `t3 -15`) ran the `t` command ("TEST refused"). `?` `h` `t` `x` must now be
+  sent alone; SIM names are matched first, `=` optional (`Rad -15`).
+- New SIM override `Tout=..` (T_out held; feasibility and the display use it), cleared by `clr` / 30 min like the others.
+- Serial names: T1 = Ret (loop return), T2 = Mix (V2 outlet), T3 = Rad (outdoor rad) in the status line, `?`, fault and
+  alarm names (`NTC-MIX`, `MIX-LOW`, `RET-LOW`, `RET-LOW-IDLE`). SIM accepts Ret/Mix/Rad and T1/T2/T3. CSV columns unchanged.
 
 ## FW 0.9.7c — 2026-11-06 (HW 6b)
 - Fans (Vlad): `FAN_PWM_MIN` 30 → 10 %. Kick-start (60 % / 3 s) replaced by boosts at 30 %: 5 s on every start from 0,

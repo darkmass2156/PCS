@@ -407,9 +407,9 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
   - Liveness: the LED is computed from `millis()` in `loop()` only (no timer/ISR). A hung loop freezes the
     LED at its current brightness; the 2 s watchdog then resets (LED off) and breathing resumes after boot.
 - Serial log at 1 Hz (FW 0.9.6), two formats, `txt` / `csv` switches (kept in EEPROM 8):
-  - **txt** (default): one labelled, column-aligned status line: mode + state | T1 T2 T3 Tout | DP Tset case room |
+  - **txt** (default): one labelled, column-aligned status line: mode + state | Ret (T1) Mix (T2) Rad (T3) Tout | DP Tset case room |
     V2 deg, port opening mm, outdoor share % and `>`/`<` while moving | fan % rpm1/rpm2 | P2 % rpm | NO 12V, SIM |
-    `ok` or the active faults/alarms by short name (`F:T2-LOW`, `A:SHT-R`, …).
+    `ok` or the active faults/alarms by short name (`F:MIX-LOW`, `A:SHT-R`, …).
   - **csv**: `ms,mode,state,T1,T2,T3,Tout,Troom,DP_A,DP_B,DP_R,DP,Tset,V2deg,V2mm,V2out%,fan%,pump%,rpmF1,rpmF2,rpmP2,
     V1,fuses,faults,alarms` (fuses/faults/alarms as hex bitmasks, see `control.h`).
   - V2 mm = motion past the edge × `V2_MM_PER_MS` (1.35 mm / 500 ms); outdoor % = 0 at the edge, 50 at `V2_HALF_MS`,
@@ -420,9 +420,12 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 - Serial input (line based: CR/LF or 50 ms of silence ends a command):
   - `?` prints version, tunables, reset counters, SIM overrides, a status line (incl. I2C recoveries), the NTC inputs,
     a room SHT30 probe (D38/D40 idle levels, 0x44/0x45 ACK as wired and swapped) and all active faults/alarms.
+    One-letter commands (`?` `h` `t` `x`) must be sent alone (FW 0.9.7d: `tout-15` used to enter test mode).
     `h` = help. `m1` / `m2` / `m3` = mode, exactly as the buttons (also acknowledges faults whose cause is gone).
-  - **SIM overrides** (FW 0.9.3): `T1=..` `T2=..` `T3=..` `TR=..` (room T, needs a valid SHT30; its DP stays real)
-    `DP=..` force a value into the control logic; `T2=` clears one, `clr` all, auto-clear after `TEST_TIMEOUT_MS`
+  - **SIM overrides** (FW 0.9.3, names FW 0.9.7d): `Ret=..` (T1) `Mix=..` (T2) `Rad=..` (T3) — `T1=` `T2=` `T3=` still work —
+    `TR=..` (room T, needs a valid SHT30; its DP stays real), `DP=..`, `Tout=..` (T_out held at the value, feasibility
+    uses it) force a value into the control logic. `=` is optional (`Rad -15`, `rad-15`); names case-insensitive.
+    `Mix=` clears one, `clr` all, auto-clear after `TEST_TIMEOUT_MS`
     (30 min). Every fault and limit sees the forced value (e.g. `T2=5` with P2 on trips T2 LOW). SIM shows on the
     display and in `?`. For dry runs of the fault paths and the regulation; never leave one on the real loop.
   - **Reset counters**: EEPROM 4..7 count watchdog / brown-out / external / power-on resets (saturating); printed at
