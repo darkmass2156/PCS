@@ -519,6 +519,9 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - Decided (Vlad 2026-11-04): run without V1 for now; a replacement can come later. The outdoor branch has no
   fail-closed valve: on a fault it shuts when V2 reaches the edge (at most ~0.7 s play + ~4 s from all ports open).
 - OPEN: freeze guard behaviour (PROPOSAL, not implemented)
+- PROPOSAL (Vlad 2026-11-06, later): display still corrupts in the PC even at 1 MHz SPI. Idea: an ESP32 behind the
+  display drives the panel locally; the Mega sends it data over the existing C4/C5 wires (e.g. UART instead of SPI),
+  no other hardware change. To draft before coding (power: the Mega 3.3V pin can't feed an ESP32).
 - OPEN: LED colour table — keep scheme 1 or adopt the rev 6b proposal (`LED_SCHEME 2`); decide after `13_led_pins`
 - Bench (rev 6b): display at 4 MHz on PC USB, soaked for hours under load with pump/fans/valve switching (drop to
   2 MHz on any glitch); serial log of sensor validity (the `#` event lines)
