@@ -1,6 +1,6 @@
 #pragma once
 // Bump FW_VERSION on every firmware change and add a CHANGELOG.md entry.
-#define FW_VERSION "0.9.7b"
+#define FW_VERSION "0.9.7c"
 #define LOGIC_REV  2
 #define HW_REV     "6b"
 #define DISPLAY_REV 10   // display software: layout, splash, drawing (bump on any screen change)

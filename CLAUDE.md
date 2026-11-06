@@ -341,9 +341,13 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
 - Staged after V2: held at minimum until V2 ≥ 90 % (81°) and T2 is still above T_set + deadband; then step up.
 - When T2 drops below T_set − deadband, step fans down first; V2 only closes once fans are at minimum.
 - Held at minimum while T3 < DP (limits condensation on the indoor blue line).
-- Outside RUN they sit at minimum (`FAN_PWM_MIN` 30 %; bench 2026-11-05: at 20 % they stall or crawl at ~330 rpm).
-- Kick-start: when the read fan shows 0 rpm and the target is below `FAN_KICK_PCT` (60 %), it runs 60 % for 3 s,
-  then the target; retried every 10 s while it stays at 0 (also in test mode).
+- Outside RUN they sit at minimum (`FAN_PWM_MIN` 10 %, Vlad 2026-11-06: f10 is the lowest that runs, 0 → 10 starts at
+  room temp; re-check outdoors and make it a revision).
+- Boosts (FW 0.9.7c), all at `FAN_BOOST_PCT` (30 %), then back to the target; computed every loop pass:
+  - start: duty goes from 0 to > 0 (boot, 12V back, `f..` from `f0`) → `FAN_START_MS` (5 s).
+  - stall: the read fan (FAN2) shows 0 rpm with a target below 30 % → 5 s, retried every `FAN_KICK_RETRY_MS` (10 s).
+  - exercise: target at `FAN_PWM_MIN` or below for `FAN_EXERCISE_EVERY_MIN` (60 min) → `FAN_EXERCISE_S` (10 s).
+  The fan block sits at the top of `config.h` ("FAN TUNING - edit here").
 
 ### P2
 - Fixed `P2_PWM_RUN` = 80 %. ASSUMED: higher duty = faster (verify in `09_pump2`).
@@ -497,7 +501,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
-- Fans: `FAN_PWM_MIN` = 30, `FAN_KICK_PCT` = 60, `FAN_KICK_MS` = 3000, `FAN_KICK_RETRY_MS` = 10000, `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 0, `FAN1_TACH_MIN_PCT` = 30
+- Fans: `FAN_PWM_MIN` = 10, `FAN_BOOST_PCT` = 30, `FAN_START_MS` = 5000, `FAN_KICK_RETRY_MS` = 10000, `FAN_EXERCISE_EVERY_MIN` = 60, `FAN_EXERCISE_S` = 10, `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 0, `FAN1_TACH_MIN_PCT` = 30
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250, `FUSE_AVG` = 8, `FUSE_READ_MS` = 10
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = −0.15 / +0.67 / +0.54, valid −40…+80 °C

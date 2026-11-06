@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-06 | 0.9.7c + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7b + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7a + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild | rev11 | — |
 | 2026-11-05 | 0.9.7 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.7` |
@@ -81,6 +82,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.7c — 2026-11-06 (HW 6b)
+- Fans (Vlad): `FAN_PWM_MIN` 30 → 10 %. Kick-start (60 % / 3 s) replaced by boosts at 30 %: 5 s on every start from 0,
+  5 s every 10 s while FAN2 reads 0 rpm, 10 s exercise after 60 min at minimum. Boosts are timed every loop pass
+  (the old kick only ended at the next V2 control period in RUN).
+- Fan tunables moved to a "FAN TUNING - edit here" block at the top of `config.h`.
 
 ## FW 0.9.7b — 2026-11-06 (HW 6b)
 - `FAN1_TACH_FITTED 0`: fan 1 out of the tach / stall alarm / kick-start / display (Vlad). On PW the FAN1 header tach pin is

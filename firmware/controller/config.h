@@ -1,6 +1,16 @@
 #pragma once
 // Pin map and tunables. Pin map mirrors CLAUDE.md (authoritative), hardware rev 6b.
 
+// ================= FAN TUNING - edit here =================
+// Bench 2026-11-06 (Vlad): f10 is the lowest duty that runs, 0 -> 10 works at room temp. Re-check outside.
+#define FAN_PWM_MIN           10    // % minimum duty: idle / outside RUN / lowest step in RUN
+#define FAN_BOOST_PCT         30    // % duty of every boost (start, stall retry, exercise)
+#define FAN_START_MS        5000UL  // ms boost when starting from 0 and on a 0 rpm retry, then back to the target
+#define FAN_KICK_RETRY_MS  10000UL  // ms between boosts while the read fan (FAN2) stays at 0 rpm
+#define FAN_EXERCISE_EVERY_MIN 60   // min at FAN_PWM_MIN (or below) before an exercise boost
+#define FAN_EXERCISE_S        10    // s exercise boost
+// ==========================================================
+
 // ---------------- Pins ----------------
 #define PIN_S1        A0   // P2 fuse sense
 #define PIN_S2        A1   // fan fuse sense
@@ -95,10 +105,6 @@
 #define P2_PWM_RUN       80
 #define P2_SPINUP_MS     3000UL
 #define PUMP_STALL_MS    5000UL
-#define FAN_PWM_MIN      30       // 05 bench 2026-11-05: 20 % stalls / ~330 rpm, 30 % steady ~1000 rpm
-#define FAN_KICK_PCT     60       // kick-start duty when the fan reads 0 rpm below this
-#define FAN_KICK_MS      3000UL
-#define FAN_KICK_RETRY_MS 10000UL
 #define FAN_STEP_PCT     5
 #define FAN_STAGE_DEG    81.0f    // 90 % of travel
 #define FAN1_TACH_FITTED 0       // 0 (Vlad 2026-11-06): FAN1 header tach is tied to PWM on PW, fan 1 ticks with its tach on it.

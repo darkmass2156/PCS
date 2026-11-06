@@ -34,23 +34,47 @@ static void p2AndV1Off() {
   hwSetPumpPct(0);
 }
 
-// Kick-start: an iPPC at low duty doesn't start from standstill (bench 2026-11-05: 20 % from stop gave 0 / 330 rpm,
-// 30 % ramps to ~1000). When the fan reads 0 rpm and the target is below FAN_KICK_PCT, run FAN_KICK_PCT for
-// FAN_KICK_MS, then the target; retried every FAN_KICK_RETRY_MS while it stays at 0.
-static uint32_t kickUntil, lastKickAt;
+// Fan duty = the target (fanPct) unless a boost is running. A boost runs FAN_BOOST_PCT for a while, then the
+// target again. Boosts (FW 0.9.7c, Vlad 2026-11-06):
+//  - start: the fans go from 0 to anything above 0 (boot, 12V back) -> FAN_START_MS.
+//  - stall: the read fan (FAN2) shows 0 rpm with a target above 0 -> FAN_START_MS, retried every FAN_KICK_RETRY_MS.
+//  - exercise: the target sat at FAN_PWM_MIN or below for FAN_EXERCISE_EVERY_MIN -> FAN_EXERCISE_S.
+// fanService() runs every pass, so a boost ends on time even where the target is only set every V2 period.
+static uint32_t boostUntil, lastKickAt, idleSince;
 static bool kickedOnce;
-static void setFans(uint8_t pct) {
-  fanPct = pct;
-  uint32_t now = millis();
-  bool stopped = rpmFan2 == 0;   // the read fan (FAN2 header); no pulses in the last second
-  if (pct > 0 && pct < FAN_KICK_PCT && stopped && (int32_t)(kickUntil - now) <= 0 &&
+static uint8_t fanApplied;
+static void fanBoost(uint32_t now, uint32_t ms) {
+  if ((int32_t)(boostUntil - (now + ms)) < 0) boostUntil = now + ms;
+}
+static void fanService(uint32_t now) {
+  uint8_t pct = fanPct;
+  if (pct == 0) {
+    boostUntil = now;
+    if (fanApplied) hwSetFanPct(0);
+    fanApplied = 0;
+    return;
+  }
+  if (fanApplied == 0) fanBoost(now, FAN_START_MS);   // start from standstill
+  bool boosting = (int32_t)(boostUntil - now) > 0;
+  if (!boosting && rpmFan2 == 0 && pct < FAN_BOOST_PCT &&
       (!kickedOnce || now - lastKickAt >= FAN_KICK_RETRY_MS)) {
-    kickUntil = now + FAN_KICK_MS;
+    fanBoost(now, FAN_START_MS);
     lastKickAt = now;
     kickedOnce = true;
   }
-  bool kicking = pct > 0 && (int32_t)(kickUntil - now) > 0;
-  hwSetFanPct(kicking && pct < FAN_KICK_PCT ? FAN_KICK_PCT : pct);
+  if (pct > FAN_PWM_MIN) idleSince = now;
+  else if (now - idleSince >= FAN_EXERCISE_EVERY_MIN * 60000UL) {
+    fanBoost(now, FAN_EXERCISE_S * 1000UL);
+    idleSince = now;
+  }
+  boosting = (int32_t)(boostUntil - now) > 0;
+  uint8_t out = boosting && pct < FAN_BOOST_PCT ? FAN_BOOST_PCT : pct;
+  if (out != fanApplied) hwSetFanPct(out);
+  fanApplied = out;
+}
+static void setFans(uint8_t pct) {
+  fanPct = pct;
+  fanService(millis());
 }
 
 static bool flowing() {
@@ -264,6 +288,7 @@ void controlUpdate(uint32_t now) {
   if (v12 && !v12Was) v12At = now;
   v12Was = v12;
   valveSetPowerOk(v12 && fusePresent[2]);
+  fanService(now);
 
   updateDerived(now);
 
