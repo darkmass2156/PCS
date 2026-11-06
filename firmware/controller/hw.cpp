@@ -96,7 +96,9 @@ void hwInit() {
   hwSetFanPct(0);
   hwSetPumpPct(0);
 
-  pinMode(PIN_TACH1, INPUT_PULLUP);   // fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04), no LG 10k:
+  // Fan tachs wired straight PW C22/D22 -> D18/D19 (2026-11-04). FAN1_TACH_FITTED 0: D18 plain input, no pull-up
+  // (the FAN1 header tach is tied to the PWM net on PW, 2026-11-06).
+  pinMode(PIN_TACH1, FAN1_TACH_FITTED ? INPUT_PULLUP : INPUT);
   pinMode(PIN_TACH2, INPUT_PULLUP);   // internal ~35k pull-up (an external 10k at the Mega end is still welcome)
   pinMode(PIN_PUMP_TACH, INPUT);
   tachTimerInit();

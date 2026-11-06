@@ -80,8 +80,10 @@ coolant entering the PC must never drop below in-case dew point + margin.
   50 °C on the bench (17 W held open for the whole RUN, inside the box). Possibly replaced later by a second 3-way
   (OPEN). See `docs/changes/v1_dropped.md`.
 - **Fans**: 2× NF-F12 iPPC-3000 on the outdoor XE 240. Their 12V is unswitched; only PWM controls them.
-  Since 2026-11-05 fan 1 on FAN1 (tach D18) and fan 2 on FAN2 (tach D19), one shared PWM (`FAN1_TACH_FITTED 1`).
-  Below `FAN1_TACH_MIN_PCT` (30 %) fan 1's tach picks up the PWM, so it reports fan 2's rpm there (Vlad 2026-11-05).
+  Fan 1 on FAN1, fan 2 on FAN2, one shared PWM. **Only fan 2's tach is read** (D19, `FAN1_TACH_FITTED 0`, Vlad 2026-11-06):
+  on PW the FAN1 header tach pin is tied to the PWM net; with fan 1's tach on it the fan pulls its own PWM and ticks /
+  skips (same as touching tach to PWM). Fan 1's tach wire stays unplugged; not fixed. Flip to 1 once PW is repaired
+  (then below `FAN1_TACH_MIN_PCT` 30 % fan 1 reports fan 2's rpm).
 - **NTCs**: 3× Bykski B-PD5-TMR 10k probes on the Mega (T1, T2, T3). The cube NTC goes to the Apex.
 - **Humidity**: 2× SHT31 in the case (hardware I2C) + 1× SHT30 on the room side (software I2C, own bus
   because 0x44/0x45 are taken). SHT30 powered from the Mega header 5V/GND; no board change.
@@ -109,7 +111,7 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D3 | PUMP_PWM | OC3C, 25 kHz |
 | D9 / D10 / D11 | LED R / B / G | common-cathode RGB, analogWrite (Timer2 / Timer1). As built G and B are swapped vs the pinout doc (green die on D11, blue on D10, bench 2026-11-03); `PIN_LED_G/B` and `bench.h` follow the build |
 | D12 | PUMP_TACH | PB6, sampled by Timer4 (no interrupt) |
-| D18 | TACH1 | straight from PW C22 (FAN1 pin 3), RC as D19; below 30 % duty its reading is replaced by fan 2's |
+| D18 | TACH1 | **unused** (`FAN1_TACH_FITTED 0`, plain INPUT): PW FAN1 tach pin is tied to PWM. Was straight from PW C22 (FAN1 pin 3), RC as D19 |
 | D19 | TACH2 | INT2. Straight from PW D22 (LINK 4 off LG A6, H5·3 empty), 10k to 5V + 100 nF to GND at the Mega, internal pull-up on |
 | D20 / D21 | SDA / SCL | 4.7k pull-ups to 5V |
 | D22 | VO | V2 open |
@@ -495,7 +497,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
   `V2_START_RATE_DEG_MIN` = 5 (counted from the edge)
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
-- Fans: `FAN_PWM_MIN` = 30, `FAN_KICK_PCT` = 60, `FAN_KICK_MS` = 3000, `FAN_KICK_RETRY_MS` = 10000, `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 1, `FAN1_TACH_MIN_PCT` = 30
+- Fans: `FAN_PWM_MIN` = 30, `FAN_KICK_PCT` = 60, `FAN_KICK_MS` = 3000, `FAN_KICK_RETRY_MS` = 10000, `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 0, `FAN1_TACH_MIN_PCT` = 30
 - Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250, `FUSE_AVG` = 8, `FUSE_READ_MS` = 10
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = −0.15 / +0.67 / +0.54, valid −40…+80 °C

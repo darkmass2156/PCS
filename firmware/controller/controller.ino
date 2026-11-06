@@ -102,7 +102,8 @@ static void statusLine(uint32_t now) {
   if (valveBusy()) Serial.print(valveMoving() == V_OPEN ? F(" >") : valveMoving() == V_CLOSE ? F(" <") : F(" ."));
   else Serial.print(F("  "));
   Serial.print(F(" | fan")); numU(hwFanPct(), 4); Serial.print('%');
-  numU(rpmFan1, 5); Serial.print('/'); numU(rpmFan2, 4);
+  if (FAN1_TACH_FITTED) { numU(rpmFan1, 5); Serial.print('/'); } else Serial.print(F("  rpm"));
+  numU(rpmFan2, 5);
   Serial.print(F(" | P2")); numU(hwPen() ? hwPumpPct() : 0, 4); Serial.print('%'); numU(rpmPump, 5);
   if (V1_FITTED) { Serial.print(F(" | V1 ")); Serial.print(hwSen() ? F("open") : F("shut")); }
   if (!hw12vPresent()) Serial.print(F(" | NO 12V"));
@@ -140,7 +141,7 @@ static void logLine(uint32_t now) {
   Serial.print(',');
   Serial.print(hwPen() ? hwPumpPct() : 0);
   Serial.print(',');
-  Serial.print(rpmFan1);
+  if (FAN1_TACH_FITTED) Serial.print(rpmFan1);   // empty field: no fan 1 tach
   Serial.print(',');
   Serial.print(rpmFan2);
   Serial.print(',');

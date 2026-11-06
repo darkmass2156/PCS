@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-06 | 0.9.7b + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7a + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild | rev11 | — |
 | 2026-11-05 | 0.9.7 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.7` |
 | 2026-11-05 | 0.9.6 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.6` |
@@ -80,6 +81,12 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.7b — 2026-11-06 (HW 6b)
+- `FAN1_TACH_FITTED 0`: fan 1 out of the tach / stall alarm / kick-start / display (Vlad). On PW the FAN1 header tach pin is
+  tied to the PWM net: with fan 1's tach wire on it the fan modulates its own PWM and ticks. Wire left unplugged.
+- D18 plain INPUT when unfitted (no pull-up on the PWM net). Serial txt shows `fan  30%  rpm 1020`; csv rpmF1 field empty.
+- Flip to 1 after the PW fix; nothing else to change.
 
 ## FW 0.9.7a — 2026-11-06 (HW 6b, passive LG rebuild)
 Work-in-progress letter: stays 0.9.7x until the rebuilt board works end to end.
