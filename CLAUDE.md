@@ -67,7 +67,9 @@ coolant entering the PC must never drop below in-case dew point + margin.
   from the PC PSU and the in-case parts). USB can be live while 12V is off (S3/S5).
   Programming from a Mac on mains makes a ground loop that corrupts the display SPI: Mac on battery, a USB
   isolator (ADuM3160), or plug it in only to upload.
-- **Boards (rev 6b)**: two 60x80 perfboards. **PW** (fuses, FETs, field terminals) and **LG** (all logic).
+- **Boards (rev 6b)**: two 60x80 perfboards. **PW** (fuses, FETs, field terminals) and **LG**. Since 2026-11-06 LG is passive:
+  only the display dividers (330/680), the button 1k and the LED resistors; NTC pull-ups (10k 1 % + 100 nF) and tach 10k sit on
+  the filter board, VO/VC/PEN/SEN and S1–S3 run straight from PW, the SHT31 bus uses the modules' own pull-ups.
   PW ↔ LG: 16 soldered wires (PW strip col 22 rows A–P ↔ LG row A, GND on wires 8–9).
   LG ↔ Mega: 34-pin ribbon (red stripe = pin 34) split into Dupont housings H1–H8. 24 AWG on LG, 20/22 AWG power on PW.
   V2 flyback diodes are SB560 (band on the switched side).
@@ -97,7 +99,7 @@ coolant entering the PC must never drop below in-case dew point + margin.
 Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/controller_pinout_rev6b.md`.
 | Pin | Signal | Notes |
 |---|---|---|
-| A0 | S1 | P2 fuse sense, 47k/20k divider (12V ≈ 3.58 V) |
+| A0 | S1 | P2 fuse sense, 47k/20k divider on PW (12V ≈ 3.58 V), no filter cap since the LG rebuild |
 | A1 | S2 | fan fuse sense |
 | A2 | S3 | V1 + V2 fuse sense |
 | A3 | T3 | outdoor XE 240 |
@@ -114,8 +116,8 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
 | D24 | VC | V2 close |
 | D26 | PEN | P2 enable |
 | D28 | SEN | V1 enable |
-| D30 / D32 | BTN1 / BTN2 | 10k pull-up, 1k + 100 nF RC, active LOW |
-| D38 / D40 | SDA2 / SCL2 | SHT30, software I2C, wired straight to the Mega header (FW 0.7.1; D34/D36 via LG never answered, those pins are now unused) |
+| D30 / D32 | BTN1 / BTN2 | rebuilt LG (FW 0.9.7a): 1k in series only, `INPUT_PULLUP`, active LOW, 30 ms software debounce |
+| D38 / D40 | SDA2 / SCL2 | SHT30, software I2C, wired straight to the Mega header (FW 0.7.1; D34/D36 via LG never answered, now unused: `INPUT_PULLUP`, never driven) |
 | D47 | DISP_RES | ST7789 RES via 330/680 Ω divider (680 Ω to GND: must be driven), C5 pin 3 — rev 6b |
 | D49 | DISP_CS | ST7789 CS via 330/680 Ω divider |
 | D51 / D52 / D53 | MOSI / SCK / DC | ST7789 via 330/680 Ω dividers; D50 (MISO) unused, not wired |
@@ -159,8 +161,10 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
     `NTC_FLOAT_DELTA` (40) is floating (broken ribbon / housing between LG and Mega) and is treated as open. Without it
     a floating pin returns a plausible fake temperature (bench 2026-11-01: T2 stuck at ~17.5 °C).
 - **Fuse sense**: compare against thresholds with hysteresis (see Tunables). Binary present/absent check.
+  No filter caps since the LG rebuild (FW 0.9.7a): one channel per `FUSE_READ_MS` (10 ms), one read discarded, then the
+  average of `FUSE_AVG` (8).
 - **Tach**: open-collector, 2 pulses/rev. Fan (D19): wired straight from PW U21, 1k in series, 10k to 5V + 100 nF to
-  GND on the fan side of the 1k, internal pull-up on. P2 (D12): 10k on LG. **Sampled, not edge-triggered** (FW 0.9.1):
+  GND on the fan side of the 1k, internal pull-up on. P2 (D12): 10k on the filter board. **Sampled, not edge-triggered** (FW 0.9.1):
   Timer4 reads D19 / D12 (and D18 if fitted) every ~250 µs; a level change counts only after `TACH_DEBOUNCE` (3)
   samples in a row. Bench 2026-11-04: edge interrupts counted glitches and lost single pulses (per-pulse rpm showed
   exactly 2:1); 3000 rpm = 5 ms per half, D5 ~4800 rpm = 3.1 ms. Timer4 is reserved for this.
@@ -492,7 +496,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 - V1: `V1_FITTED` = 0 (dropped), `V1_OFF_DELAY_MS` = 10000
 - P2: `P2_PWM_RUN` = 80, `P2_SPINUP_MS` = 3000, `PUMP_STALL_MS` = 5000
 - Fans: `FAN_PWM_MIN` = 30, `FAN_KICK_PCT` = 60, `FAN_KICK_MS` = 3000, `FAN_KICK_RETRY_MS` = 10000, `FAN_STEP_PCT` = 5, `FAN_STAGE_DEG` = 81, `FAN_STALL_MS` = 5000, `TACH_DEBOUNCE` = 3, `FAN1_TACH_FITTED` = 1, `FAN1_TACH_MIN_PCT` = 30
-- Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250
+- Fuse sense: `FUSE_PRESENT_ADC` = 500, `FUSE_ABSENT_ADC` = 250, `FUSE_AVG` = 8, `FUSE_READ_MS` = 10
 - `LED_SCHEME` = 1 (2 = rev 6b PROPOSAL), `LED_BRIGHTNESS_PCT` = 80, `TEST_TIMEOUT_MS` = 1800000, `SHT_WIRE_TIMEOUT_US` = 25000
 - NTCs: `NTC_ADC_SHORT` = 8, `NTC_ADC_OPEN` = 1015, `NTC_FLOAT_DELTA` = 40, `NTC_R25` = 10000, `NTC_BETA` = 3435 (ASSUMED), `NTC_OFFSET_T1/T2/T3` = −0.15 / +0.67 / +0.54, valid −40…+80 °C
 - `LONG_PRESS_MS` = 2000, `WDT_ENABLE` = 1

@@ -101,8 +101,10 @@ void hwInit() {
   pinMode(PIN_PUMP_TACH, INPUT);
   tachTimerInit();
 
-  pinMode(PIN_BTN1, INPUT);    // external 10k pull-ups + RC
-  pinMode(PIN_BTN2, INPUT);
+  pinMode(PIN_BTN1, INPUT_PULLUP);   // rebuilt LG (FW 0.9.7a): only 1k in series, no external pull-up / cap
+  pinMode(PIN_BTN2, INPUT_PULLUP);
+  pinMode(PIN_UNUSED_34, INPUT_PULLUP);   // old SHT30 pins, not driven
+  pinMode(PIN_UNUSED_36, INPUT_PULLUP);
   lastRpmAt = millis();
 }
 
@@ -135,9 +137,20 @@ static bool fuseRaw[3];
 static bool v12Raw, v12Stable;
 static uint32_t v12ChangeAt;
 
+static uint8_t fuseCh;
+static uint32_t fuseReadAt;
+
+// Rebuilt LG (FW 0.9.7a): the dividers on PW feed A0..A2 with no filter cap (~14k source). One channel per pass
+// every FUSE_READ_MS: one read discarded (mux settle), then the average of FUSE_AVG samples (~1 ms per pass).
 void hwUpdateFuses(uint32_t now) {
-  for (uint8_t i = 0; i < 3; i++) {
-    uint16_t a = analogRead(fusePins[i]);
+  if (now - fuseReadAt >= FUSE_READ_MS) {
+    fuseReadAt = now;
+    uint8_t i = fuseCh;
+    fuseCh = (fuseCh + 1) % 3;
+    analogRead(fusePins[i]);
+    uint16_t sum = 0;
+    for (uint8_t k = 0; k < FUSE_AVG; k++) sum += analogRead(fusePins[i]);
+    uint16_t a = sum / FUSE_AVG;
 #if SIM_FORCE_12V
     a = 1023;
 #endif

@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-06 | 0.9.7a + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild | rev11 | — |
 | 2026-11-05 | 0.9.7 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.7` |
 | 2026-11-05 | 0.9.6 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.6` |
 | 2026-11-05 | 0.9.5 + lite 1.8 | 10 | 1.9 | 2 | **6b**, V1 not fitted, two fan tachs | rev11 | `fw-v0.9.5` |
@@ -78,6 +79,15 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+
+## FW 0.9.7a — 2026-11-06 (HW 6b, passive LG rebuild)
+Work-in-progress letter: stays 0.9.7x until the rebuilt board works end to end.
+- Buttons D30/D32 `INPUT_PULLUP` (the LG 10k pull-ups and 100 nF are gone, only the 1k in series stay). Fixes dead buttons.
+- D34/D36 (old SHT30 pins) `INPUT_PULLUP`, never driven.
+- Fuse sense (no filter caps now): one channel every 10 ms, first read discarded, average of 8 (`FUSE_AVG`, `FUSE_READ_MS`).
+- Unchanged: NTC open-pin check (100 µs internal pull-up, harmless with the 100 nF), SPI 4 MHz, display RES hard reset at boot
+  only + soft re-init, tach pin modes, LED G/B mapping (G D11 / B D10 until checked on the rebuilt board).
 
 ## FW 0.9.7 — 2026-11-05: V2 positioning in test mode
 - `dg<deg>`, `o<mm>`, `o<pct>%` move V2 to an absolute angle / port opening / outdoor share (from the estimate, play

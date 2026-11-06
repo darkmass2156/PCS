@@ -24,6 +24,8 @@
 #define PIN_BTN2      32
 #define PIN_SDA2      38   // SHT30 soft I2C, wired straight to the Mega header (was D34 via LG, never answered)
 #define PIN_SCL2      40
+#define PIN_UNUSED_34 34   // old SHT30 SDA2 via LG: INPUT_PULLUP, never driven
+#define PIN_UNUSED_36 36
 #define PIN_DISP_RST  47   // rev 6b: display RES through C5 pin 3 (680 Ω to GND on LG: -1 would hold it in reset)
 #define PIN_DISP_CS   49
 #define PIN_DISP_DC   53
@@ -108,6 +110,8 @@
 #define FUSE_PRESENT_ADC 500
 #define FUSE_ABSENT_ADC  250
 #define FUSE_DEBOUNCE_MS 1000UL
+#define FUSE_AVG         8      // samples averaged per read (first read after the mux switch discarded)
+#define FUSE_READ_MS     10     // one channel per pass, so each fuse is read every 30 ms
 #define V12_STABLE_MS    1000UL
 
 // ---------------- Status LED ----------------
