@@ -10,6 +10,7 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 ## Revision index
 | Date | FW | Disp | Bench | Logic | HW | Schematic | Git tag |
 |---|---|---|---|---|---|---|---|
+| 2026-11-06 | 0.9.7e + lite 1.8 | 10 | 1.9 | 2 | **6b**, installed in the PC, display 1 MHz | rev11 | — |
 | 2026-11-06 | 0.9.7d + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7c + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
 | 2026-11-06 | 0.9.7b + lite 1.8 | 10 | 1.9 | 2 | **6b**, passive LG rebuild, fan 2 tach only | rev11 | — |
@@ -83,6 +84,10 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+
+## FW 0.9.7e — 2026-11-06 (HW 6b, installed in the PC)
+- `DISP_SPI_HZ` 4 → 1 MHz: in the PC the display shows artifacts at 2 MHz and crashes at 4 MHz (Vlad). Comment notes
+  that AVR SPI rounds down to 8/4/2/1/0.5 MHz (1.5 MHz = 1 MHz, 3 MHz = 2 MHz). Boot splash and mode changes are slower.
 
 ## FW 0.9.7d — 2026-11-06 (HW 6b)
 - Bug: anything starting with `t` (`tout-15`, `t3 -15`) ran the `t` command ("TEST refused"). `?` `h` `t` `x` must now be

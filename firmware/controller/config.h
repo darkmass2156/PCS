@@ -41,7 +41,9 @@
 #define PIN_DISP_DC   53
 
 // ---------------- Display ----------------
-#define DISP_SPI_HZ     4000000UL
+// AVR SPI runs only at 16 MHz / 2^n: 8, 4, 2, 1, 0.5 MHz; any other value rounds DOWN (1.5 MHz = 1 MHz, 3 MHz = 2 MHz).
+// Installed in the PC (Vlad 2026-11-06): 1 MHz clean, 2 MHz artifacts, 4 MHz crashes (bench before: 6 MHz worked).
+#define DISP_SPI_HZ     1000000UL
 // Display target. The firmware drives an ST7789. The Wokwi simulator only has an ILI9341, which reads
 // MADCTL differently (mirrored), wants BGR and no inversion. 1 = simulator, 0 = the real ST7789 panel.
 // The banner prints which one a build is for. Set back to 0 before flashing the real controller.

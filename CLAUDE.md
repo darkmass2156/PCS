@@ -210,8 +210,10 @@ Component → LG → ribbon → Dupont housing → Mega, per wire: `docs/control
   Remaining risks: no reset pin, 5V resistor-divider level shifting, and a ~1.5 m cable.
 - **Wiring** (rev 6b): CS = 49, DC = 53, **RES = 47** (all through 330/680 Ω dividers), default SPI mode. RES has the
   680 Ω to GND, so RST = -1 would hold the panel in reset (backlight only). `init()` pulses RES.
-- **SPI clock**: 4 MHz (`DISP_SPI_HZ`). The finished 1.5 m C4 cable with the 330/660 Ω dividers worked up to
-  6 MHz on the bench (2026-10-27); 4 MHz keeps margin. `init()` itself runs at the library default, so the firmware
+- **SPI clock**: **1 MHz** (`DISP_SPI_HZ`, FW 0.9.7e). AVR SPI only has 8 / 4 / 2 / 1 / 0.5 MHz; other values round
+  down. Installed in the PC (2026-11-06): 1 MHz clean, 2 MHz artifacts, 4 MHz crashes. On the bench the 1.5 m C4 cable
+  with the 330/660 Ω dividers had worked up to 6 MHz (2026-10-27), so the PC install (routing / EMI / ground) costs the
+  margin. At 1 MHz a 24-row clear strip blocks ~125 ms (V2 θ integrates real time, so a late stop is tracked). `init()` itself runs at the library default, so the firmware
   sets `DISP_SPI_HZ` and then re-sends the init sequence (SWRESET → SLPOUT → COLMOD → NORON → DISPON) at it.
 - **D53** stays OUTPUT (DC, and SPI master needs it). **D50** is MISO, unusable as output.
 - **Backlight** is tied to VCC, so it's always on with no dimming.
@@ -488,7 +490,7 @@ Each test is its own sketch in `tests/`. P2 goes last. The harness only gets bui
 5. **K_POT**: later, on the real loop.
 
 ## Tunables (`config.h`)
-- Display: `DISP_TARGET_ILI9341_SIM` = 0, `DISP_SPI_HZ` = 4 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
+- Display: `DISP_TARGET_ILI9341_SIM` = 0, `DISP_SPI_HZ` = 1 MHz, `DISP_INVERT` = 1, `DISP_BGR` = 0, `DISP_ROTATION` = 1, `DISP_REINIT_MS` = 300000,
   `BOOT_SPLASH` = 1
 - Setpoint and margins:
   - `MARGIN_DP_C` = 4.0, `DELTA_ROOM_C` (δ) = 3.0 (TBD, bench check 1), `MODE2_FALLBACK_C` = 20.0

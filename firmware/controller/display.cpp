@@ -92,7 +92,7 @@ static uint8_t pickSplash() {
 
 void displayInit() {
   tft.init(INIT_W, INIT_H);         // runs at the library default clock ...
-  tft.setSPISpeed(DISP_SPI_HZ);     // ... so redo it at DISP_SPI_HZ (4 MHz) for the long cable
+  tft.setSPISpeed(DISP_SPI_HZ);     // ... so redo it at DISP_SPI_HZ for the long cable
   for (uint8_t i = 0; i < INIT_STEPS; i++) {
     sendStep(i);
     delay(initSeq[i].waitMs);
