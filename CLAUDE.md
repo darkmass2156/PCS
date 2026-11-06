@@ -440,6 +440,9 @@ P1 (PC-controlled, fixed 90 %) → cube → GPU → RAM → CPU → 120 rad → 
     P2 on, P2 stall, fuses, NTCs) and a fault goes to SAFE as usual. Leaves on `x`, any button, a fault, 12V loss or
     `TEST_TIMEOUT_MS` (30 min) without a command; on leaving P2 and V1 go off, fans to minimum, V2 parks.
 - Known: opening the COM port toggles DTR and resets the Mega (CH340 auto-reset) → safe boot, V2 re-park.
+  The Arduino IDE Serial Monitor always does this. `tools/pc_serial/pcs_term.py` (Python 3 + pyserial) opens the port with
+  DTR/RTS off, so the controller keeps running: finds the CH340 itself (or `py pcs_term.py COM5`), type commands,
+  `--log file` appends every line; flags it if the Mega still resets on connect. Base for the PC dashboard.
 
 ## Bench test order
 Each test is its own sketch in `tests/`. P2 goes last. The harness only gets built once every test passes.

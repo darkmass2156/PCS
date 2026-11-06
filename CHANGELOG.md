@@ -85,6 +85,9 @@ Change notes with the reasoning live in `docs/changes/`. `CLAUDE.md` is the auth
 
 
 
+## DOC — 2026-11-06
+- `tools/pc_serial/pcs_term.py`: PC serial terminal that opens the port with DTR off (no Mega reset on connect), optional log.
+
 ## FW 0.9.7e — 2026-11-06 (HW 6b, installed in the PC)
 - `DISP_SPI_HZ` 4 → 1 MHz: in the PC the display shows artifacts at 2 MHz and crashes at 4 MHz (Vlad). Comment notes
   that AVR SPI rounds down to 8/4/2/1/0.5 MHz (1.5 MHz = 1 MHz, 3 MHz = 2 MHz). Boot splash and mode changes are slower.
